@@ -77,7 +77,12 @@ export const ratingSchema = z
     message: `Rating must be in steps of ${RATING_STEP}`,
   });
 
-const GOOGLE_ZOOM = { S: 1, M: 2, L: 3 } as const;
+// Google's content endpoint returns a real (200 OK) "image not available"
+// graphic — not an error — for plenty of in-print catalog entries once you
+// ask for zoom 2+, even though zoom 1 resolves fine for the same volume.
+// There is no way to tell from the id alone which zooms a given book
+// supports, so every size asks for the one zoom level that's reliable.
+const GOOGLE_ZOOM = { S: 1, M: 1, L: 1 } as const;
 
 /**
  * Cover URL, derived from the provider key rather than stored.
