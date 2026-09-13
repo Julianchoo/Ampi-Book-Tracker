@@ -2,6 +2,19 @@ import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { db } from "./db"
 
+/**
+ * OAuth redirect URIs must match what the provider has registered, so in
+ * production the base URL has to be the stable public domain rather than
+ * whatever host the request happened to arrive on. Previews and local dev fall
+ * through to undefined, where Better Auth derives it from the request.
+ */
+const baseURL =
+  process.env.BETTER_AUTH_URL ||
+  (process.env.VERCEL_ENV === "production" &&
+  process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : undefined)
+
 const googleClientId = process.env.GOOGLE_CLIENT_ID
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET
 
@@ -13,6 +26,7 @@ const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET
 export const isGoogleEnabled = Boolean(googleClientId && googleClientSecret)
 
 export const auth = betterAuth({
+  ...(baseURL ? { baseURL } : {}),
   database: drizzleAdapter(db, {
     provider: "pg",
   }),
