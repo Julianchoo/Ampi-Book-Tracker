@@ -61,7 +61,7 @@ export default async function HomePage() {
 
 /** The hero: the book you most recently picked up. */
 function CurrentBook({ book }: { book: Book }) {
-  const cover = coverUrl(book.coverId, "L");
+  const cover = coverUrl(book.olKey, book.coverId, "L");
   const started = formatDate(book.startedAt);
 
   return (

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ratingSchema, shelfSchema, statusSchema } from "@/lib/books";
+import { SOURCES } from "@/lib/books";
 import { db } from "@/lib/db";
 import { book } from "@/lib/schema";
 import { requireAuth } from "@/lib/session";
@@ -24,7 +25,9 @@ const addSchema = z.object({
   olKey: z.string().min(1),
   title: z.string().min(1).max(500),
   author: z.string().max(300).nullish(),
+  source: z.enum(SOURCES).default("openlibrary"),
   coverId: z.number().int().positive().nullish(),
+  description: z.string().max(20000).nullish(),
   firstPublishYear: z.number().int().min(0).max(2200).nullish(),
   pages: z.number().int().positive().max(100000).nullish(),
   language: z.string().max(20).nullish(),
@@ -68,7 +71,9 @@ export async function addBook(
       olKey: d.olKey,
       title: d.title,
       author: d.author ?? null,
+      source: d.source,
       coverId: d.coverId ?? null,
+      description: d.description ?? null,
       firstPublishYear: d.firstPublishYear ?? null,
       pages: d.pages ?? null,
       language: d.language ?? null,

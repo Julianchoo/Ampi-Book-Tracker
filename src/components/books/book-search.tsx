@@ -20,6 +20,8 @@ import { cn } from "@/lib/utils";
 
 type Hit = {
   olKey: string;
+  source: "openlibrary" | "google";
+  description: string | null;
   title: string;
   author: string | null;
   coverId: number | null;
@@ -97,6 +99,10 @@ export function BookSearch({ className }: { className?: string | undefined }) {
     setPending(hit.olKey);
     const result = await addBook({
       olKey: hit.olKey,
+      source: hit.source,
+      // Google returns the blurb inline; storing it now means the book page
+      // opens with no network call of its own.
+      description: hit.description,
       title: hit.title,
       author: hit.author,
       coverId: hit.coverId,
@@ -115,13 +121,22 @@ export function BookSearch({ className }: { className?: string | undefined }) {
 
     setOpen(false);
     setQuery("");
-    if (shelf === "library") {
-      toast.success(`Added “${hit.title}” — tell us how it went`);
-      router.push(`/books/${result.id}?welcome=1`);
-    } else {
-      toast.success(`“${hit.title}” added to your wishlist`);
-      router.refresh();
-    }
+
+    // Refresh in place rather than navigating: the shelf the user is looking
+    // at updates immediately, and they avoid a page load that waits on Open
+    // Library. Opening the book to add a rating is offered, not forced.
+    router.refresh();
+    toast.success(
+      shelf === "library"
+        ? `“${hit.title}” added to your library`
+        : `“${hit.title}” added to your wishlist`,
+      {
+        action: {
+          label: "Add details",
+          onClick: () => router.push(`/books/${result.id}?welcome=1`),
+        },
+      }
+    );
   }
 
   return (
@@ -166,7 +181,7 @@ export function BookSearch({ className }: { className?: string | undefined }) {
             {hits.length > 0 && (
               <CommandGroup>
                 {hits.map((hit) => {
-                  const cover = coverUrl(hit.coverId, "S");
+                  const cover = coverUrl(hit.olKey, hit.coverId, "S");
                   const busy = pending === hit.olKey;
                   return (
                     <CommandItem

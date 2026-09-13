@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
 import type { Shelf, SortKey, Status } from "@/lib/books";
 import { db } from "@/lib/db";
@@ -39,7 +40,8 @@ export async function getShelf(
     .orderBy(...ORDER_BY[opts.sort ?? "recent"]);
 }
 
-export async function getBook(
+/** Deduped: the book page and its generateMetadata both ask for the same row. */
+export const getBook = cache(async function getBook(
   userId: string,
   id: string
 ): Promise<Book | null> {
@@ -48,7 +50,7 @@ export async function getBook(
     .from(book)
     .where(and(eq(book.id, id), eq(book.userId, userId)));
   return row ?? null;
-}
+});
 
 /** The book for the home hero: most recently started, still being read. */
 export async function getCurrentlyReading(userId: string): Promise<Book | null> {

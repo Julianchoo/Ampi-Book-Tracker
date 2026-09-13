@@ -18,17 +18,12 @@ const SEARCH_FIELDS = [
   "subject",
 ].join(",");
 
-/** A search hit, narrowed to what a result row and a shelf entry need. */
-export type BookSearchResult = {
-  olKey: string;
-  title: string;
-  author: string | null;
-  coverId: number | null;
-  firstPublishYear: number | null;
-  pages: number | null;
-  language: string | null;
-  subjects: string[];
-};
+import type { BookSearchResult } from "@/lib/books";
+
+// Open Library regularly takes several seconds and sometimes hangs outright.
+// A bounded wait means a bad day upstream degrades the feature instead of
+// leaving the request open until the platform kills it.
+const TIMEOUT_MS = 8000;
 
 type RawDoc = {
   key?: string;
@@ -82,11 +77,13 @@ function toResult(doc: RawDoc): BookSearchResult | null {
     olKey: doc.key,
     title: doc.title,
     author: doc.author_name?.[0] ?? null,
+    source: "openlibrary",
     coverId: doc.cover_i ?? null,
     firstPublishYear: doc.first_publish_year ?? null,
     pages: doc.number_of_pages_median ?? null,
     language: pickLanguage(doc.language),
     subjects: cleanSubjects(doc.subject),
+    description: null, // Open Library only carries it on the works record
   };
 }
 
@@ -108,6 +105,7 @@ export async function searchBooks(
   const res = await fetch(url, {
     next: { revalidate: 3600 },
     headers: { "User-Agent": "BookTracker/1.0 (personal reading tracker)" },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Open Library search failed: ${res.status}`);
 
@@ -142,6 +140,7 @@ async function fetchWork(olKey: string): Promise<RawWork | null> {
   const res = await fetch(`https://openlibrary.org${path}.json`, {
     next: { revalidate: 86400 },
     headers: { "User-Agent": "BookTracker/1.0 (personal reading tracker)" },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) return null;
   return (await res.json()) as RawWork;

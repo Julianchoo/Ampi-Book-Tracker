@@ -96,7 +96,10 @@ export const book = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
 
     // Open Library snapshot
-    olKey: text("ol_key").notNull(), // e.g. "/works/OL893414W"
+    // Provider-scoped external id: "/works/OL893414W" for Open Library,
+    // "google:zyTCAlFPjgYC" for Google Books. Column name predates the second
+    // provider; it is just an opaque key.
+    olKey: text("ol_key").notNull(),
     title: text("title").notNull(),
     author: text("author"),
     coverId: integer("cover_id"), // OL cover_i -> covers.openlibrary.org
@@ -104,6 +107,11 @@ export const book = pgTable(
     pages: integer("pages"),
     language: text("language"),
     subjects: text("subjects").array(),
+    // Stored at add time when the provider returns it (Google Books does), so
+    // the book page needs no second network call to render its blurb.
+    description: text("description"),
+    // Which service olKey came from: "openlibrary" or "google".
+    source: text("source").notNull().default("openlibrary"),
 
     // The user's own data
     shelf: text("shelf").notNull(), // 'library' | 'wishlist'

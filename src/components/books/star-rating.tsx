@@ -6,15 +6,20 @@ import { MAX_RATING, RATING_STEP } from "@/lib/books";
 import { cn } from "@/lib/utils";
 
 /*
- * 10 stars, each split into two half-width buttons, giving 1.0-10.0 in 0.5
- * steps. Hand-rolled rather than pulled in: the whole interaction is a
- * clip-path and a hover index.
+ * Ratings run 1.0-10.0 in half-star steps.
+ *
+ * Input is drag-based rather than a grid of tiny tap targets: on a phone a
+ * half star is about 9px wide, which is far below a usable touch target. The
+ * whole strip is one pointer surface instead — press anywhere and slide, and
+ * the value follows the finger until release. Pointer capture keeps it
+ * tracking even when the finger wanders off the strip, and `touch-action:
+ * none` stops the page scrolling underneath the gesture.
  */
 
 const SIZES = {
   sm: "size-3.5",
   md: "size-5",
-  lg: "size-7",
+  lg: "size-8",
 } as const;
 
 type Size = keyof typeof SIZES;
@@ -40,9 +45,7 @@ function Stars({
                 className="absolute inset-0 overflow-hidden"
                 style={{ width: `${fill * 100}%` }}
               >
-                <Star
-                  className={cn(SIZES[size], "fill-star text-star")}
-                />
+                <Star className={cn(SIZES[size], "fill-star text-star")} />
               </span>
             )}
           </span>
@@ -80,11 +83,19 @@ export function StarRatingDisplay({
   );
 }
 
-/** Interactive rating input. */
+/** Snap a position along the strip (0-1) to the nearest half star. */
+function ratioToRating(ratio: number): number {
+  const clamped = Math.max(0, Math.min(1, ratio));
+  const stepped = Math.round((clamped * MAX_RATING) / RATING_STEP) * RATING_STEP;
+  // Dragging to the very start means the lowest rating, not "unrated" —
+  // clearing is an explicit action.
+  return Math.min(MAX_RATING, Math.max(RATING_STEP, stepped));
+}
+
 export function StarRatingInput({
   value,
   onChange,
-  size = "md",
+  size = "lg",
   className,
 }: {
   value: number | null;
@@ -92,65 +103,108 @@ export function StarRatingInput({
   size?: Size;
   className?: string | undefined;
 }) {
-  const [hover, setHover] = React.useState<number | null>(null);
-  const shown = hover ?? value ?? 0;
+  const stripRef = React.useRef<HTMLDivElement>(null);
+  const [draft, setDraft] = React.useState<number | null>(null);
+
+  // While dragging show the draft; otherwise the committed value.
+  const shown = draft ?? value ?? 0;
+
+  const readPointer = React.useCallback((clientX: number) => {
+    const rect = stripRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0) return null;
+    return ratioToRating((clientX - rect.left) / rect.width);
+  }, []);
+
+  function handleDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const next = readPointer(e.clientX);
+    if (next !== null) setDraft(next);
+  }
+
+  function handleMove(e: React.PointerEvent<HTMLDivElement>) {
+    // Only track once a press is in progress.
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    const next = readPointer(e.clientX);
+    if (next !== null) setDraft(next);
+  }
+
+  function handleUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    if (draft !== null) onChange(draft);
+    setDraft(null);
+  }
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <div
-        className="relative inline-flex"
-        onMouseLeave={() => setHover(null)}
-        // Keyboard users get the slider below instead of 20 tab stops
-        role="presentation"
-      >
-        <Stars value={shown} size={size} />
-        <div className="absolute inset-0 flex">
-          {Array.from({ length: MAX_RATING * 2 }, (_, i) => {
-            const step = (i + 1) * RATING_STEP;
-            return (
-              <button
-                key={i}
-                type="button"
-                tabIndex={-1}
-                aria-hidden="true"
-                className="h-full flex-1 cursor-pointer"
-                onMouseEnter={() => setHover(step)}
-                // Clicking the current value clears it — the only way back to unrated
-                onClick={() => onChange(value === step ? null : step)}
-              />
-            );
-          })}
+    <div className={cn("flex flex-col gap-2", className)}>
+      <div className="flex items-center gap-3">
+        <div
+          ref={stripRef}
+          onPointerDown={handleDown}
+          onPointerMove={handleMove}
+          onPointerUp={handleUp}
+          onPointerCancel={handleUp}
+          // Generous vertical padding so the strip is a comfortable target,
+          // and no touch-action so a horizontal drag never scrolls the page.
+          className="-my-1 cursor-pointer touch-none py-1 select-none"
+          role="presentation"
+        >
+          <Stars value={shown} size={size} />
         </div>
+
+        {/* Live read-out: during a drag this tracks the finger. */}
+        <span
+          className={cn(
+            "min-w-[4.5rem] text-lg font-semibold tabular-nums transition-colors",
+            draft !== null ? "text-star" : "text-muted-foreground"
+          )}
+          aria-live="polite"
+        >
+          {shown > 0 ? (
+            <>
+              {shown.toFixed(1)}
+              <span className="text-sm font-normal text-muted-foreground">
+                {" "}
+                / {MAX_RATING}
+              </span>
+            </>
+          ) : (
+            <span className="text-sm font-normal text-muted-foreground">
+              Not rated
+            </span>
+          )}
+        </span>
       </div>
 
-      {/* The accessible control. Arrow keys move in half stars. */}
-      <input
-        type="range"
-        min={0}
-        max={MAX_RATING}
-        step={RATING_STEP}
-        value={value ?? 0}
-        onChange={(e) => {
-          const n = Number(e.target.value);
-          onChange(n === 0 ? null : n);
-        }}
-        aria-label={`Rating out of ${MAX_RATING}`}
-        className="sr-only"
-      />
-
-      <span className="text-sm font-medium tabular-nums text-muted-foreground">
-        {value != null ? `${value.toFixed(1)} / ${MAX_RATING}` : "Not rated"}
-      </span>
-
-      {value != null && (
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-        >
-          Clear
-        </button>
-      )}
+      <div className="flex items-center gap-3">
+        {/* The accessible control. Arrow keys move in half stars. */}
+        <input
+          type="range"
+          min={0}
+          max={MAX_RATING}
+          step={RATING_STEP}
+          value={value ?? 0}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            onChange(n === 0 ? null : n);
+          }}
+          aria-label={`Rating out of ${MAX_RATING}`}
+          className="sr-only"
+        />
+        <p className="text-xs text-muted-foreground">
+          Press and slide to rate
+        </p>
+        {value != null && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            Clear
+          </button>
+        )}
+      </div>
     </div>
   );
 }

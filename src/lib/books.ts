@@ -1,5 +1,28 @@
 import { z } from "zod";
 
+/** Where a book's metadata came from. */
+export const SOURCES = ["openlibrary", "google"] as const;
+export type Source = (typeof SOURCES)[number];
+
+/**
+ * A search hit, normalised across providers so the UI never has to care which
+ * service answered.
+ */
+export type BookSearchResult = {
+  /** Provider-scoped id: "/works/OL893414W" or "google:zyTCAlFPjgYC". */
+  olKey: string;
+  source: Source;
+  title: string;
+  author: string | null;
+  coverId: number | null;
+  firstPublishYear: number | null;
+  pages: number | null;
+  language: string | null;
+  subjects: string[];
+  /** Present when the provider returns it inline, which saves a second call. */
+  description: string | null;
+};
+
 /** Shelves a book can live on. A book is on exactly one. */
 export const SHELVES = ["library", "wishlist"] as const;
 export type Shelf = (typeof SHELVES)[number];
@@ -54,14 +77,44 @@ export const ratingSchema = z
     message: `Rating must be in steps of ${RATING_STEP}`,
   });
 
-/** Cover URL for an Open Library cover id. Returns null so callers can fall back. */
+const GOOGLE_ZOOM = { S: 1, M: 2, L: 3 } as const;
+
+/**
+ * Cover URL, derived from the provider key rather than stored.
+ *
+ * Google's cover CDN is addressable by volume id and needs no API key, so a
+ * Google book's cover needs no column of its own; Open Library's is built from
+ * its numeric cover id.
+ */
 export function coverUrl(
+  olKey: string,
   coverId: number | null | undefined,
   size: "S" | "M" | "L" = "M"
 ): string | null {
+  if (olKey.startsWith("google:")) {
+    const id = olKey.slice("google:".length);
+    return (
+      `https://books.google.com/books/content?id=${encodeURIComponent(id)}` +
+      `&printsec=frontcover&img=1&zoom=${GOOGLE_ZOOM[size]}`
+    );
+  }
   return coverId
     ? `https://covers.openlibrary.org/b/id/${coverId}-${size}.jpg`
     : null;
+}
+
+/** Outbound link to whichever service the book came from. */
+export function sourceUrl(olKey: string): { href: string; label: string } {
+  if (olKey.startsWith("google:")) {
+    return {
+      href: `https://books.google.com/books?id=${olKey.slice("google:".length)}`,
+      label: "Google Books",
+    };
+  }
+  return {
+    href: `https://openlibrary.org${olKey.startsWith("/") ? olKey : `/works/${olKey}`}`,
+    label: "Open Library",
+  };
 }
 
 /**

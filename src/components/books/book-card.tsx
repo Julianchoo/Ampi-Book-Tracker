@@ -26,7 +26,7 @@ export function BookCard({
   /** Optional footer control, e.g. wishlist's "Start reading". */
   action?: React.ReactNode;
 }) {
-  const cover = coverUrl(book.coverId, "M");
+  const cover = coverUrl(book.olKey, book.coverId, "M");
   const status = book.status as Status | null;
   const finished = formatDate(book.finishedAt);
 

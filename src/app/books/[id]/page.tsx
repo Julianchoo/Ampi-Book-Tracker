@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -11,10 +12,11 @@ import {
   coverUrl,
   formatDate,
   languageName,
+  sourceUrl,
   STATUS_LABELS,
   type Status,
 } from "@/lib/books";
-import { getWorkDetail, olId } from "@/lib/openlibrary";
+import { getDescription } from "@/lib/booksearch";
 import { getBook } from "@/lib/queries";
 import { requireAuth } from "@/lib/session";
 import type { Metadata } from "next";
@@ -42,13 +44,10 @@ export default async function BookPage({
   const book = await getBook(session.user.id, id);
   if (!book) notFound();
 
-  // Live lookup for the long-form blurb. Never throws — a book page must
-  // render even when Open Library is unreachable.
-  const detail = await getWorkDetail(book.olKey);
-
-  const cover = coverUrl(book.coverId, "L");
+  const cover = coverUrl(book.olKey, book.coverId, "L");
   const status = book.status as Status | null;
-  const subjects = book.subjects?.length ? book.subjects : detail.subjects;
+  const source = sourceUrl(book.olKey);
+  const subjects = book.subjects ?? [];
 
   const facts = [
     book.firstPublishYear && { label: "First published", value: String(book.firstPublishYear) },
@@ -134,13 +133,9 @@ export default async function BookPage({
               </a>
             </Button>
             <Button asChild variant="ghost" size="sm">
-              <a
-                href={`https://openlibrary.org/works/${olId(book.olKey)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href={source.href} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="size-4" />
-                Open Library
+                {source.label}
               </a>
             </Button>
           </div>
@@ -157,19 +152,14 @@ export default async function BookPage({
         </div>
       )}
 
-      {detail.description && (
-        <section className="mt-6">
-          <h2 className="font-display text-lg font-semibold">About this book</h2>
-          {/* Open Library descriptions are plain text with hard line breaks */}
-          <div className="mt-2 space-y-3 text-sm leading-7 text-muted-foreground">
-            {detail.description
-              .split(/\n{2,}/)
-              .slice(0, 6)
-              .map((para, i) => (
-                <p key={i}>{para.replace(/\s*\n\s*/g, " ").trim()}</p>
-              ))}
-          </div>
-        </section>
+      {/* Open Library takes 2-4s to answer, so the blurb streams in rather
+          than holding up the cover, facts and edit form behind it. */}
+      {book.description ? (
+        <DescriptionBody text={book.description} />
+      ) : (
+        <Suspense fallback={<DescriptionSkeleton />}>
+          <BookDescription olKey={book.olKey} />
+        </Suspense>
       )}
 
       <div className="mt-7">
@@ -178,3 +168,45 @@ export default async function BookPage({
     </div>
   );
 }
+
+function DescriptionSkeleton() {
+  return (
+    <section className="mt-6" aria-hidden="true">
+      <div className="h-5 w-40 animate-pulse rounded bg-muted" />
+      <div className="mt-3 space-y-2">
+        <div className="h-3.5 w-full animate-pulse rounded bg-muted" />
+        <div className="h-3.5 w-11/12 animate-pulse rounded bg-muted" />
+        <div className="h-3.5 w-4/5 animate-pulse rounded bg-muted" />
+      </div>
+    </section>
+  );
+}
+
+/** Streamed: renders nothing when Open Library has no blurb for the work. */
+function DescriptionBody({ text }: { text: string }) {
+  return (
+    <section className="mt-6">
+      <h2 className="font-display text-lg font-semibold">About this book</h2>
+      {/* Provider blurbs are plain text with hard line breaks */}
+      <div className="mt-2 space-y-3 text-sm leading-7 text-muted-foreground">
+        {text
+          .split(/\n{2,}/)
+          .slice(0, 6)
+          .map((para, i) => (
+            <p key={i}>{para.replace(/\s*\n\s*/g, " ").trim()}</p>
+          ))}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Only reached by rows saved before descriptions were stored. Streamed, since
+ * the lookup can take seconds and must not hold up the rest of the page.
+ */
+async function BookDescription({ olKey }: { olKey: string }) {
+  const description = await getDescription(olKey);
+  if (!description) return null;
+  return <DescriptionBody text={description} />;
+}
+
