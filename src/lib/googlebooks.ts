@@ -14,7 +14,7 @@ import type { BookSearchResult } from "@/lib/books";
 const ENDPOINT = "https://www.googleapis.com/books/v1/volumes";
 const TIMEOUT_MS = 8000;
 
-export const isGoogleBooksEnabled = Boolean(process.env.GOOGLE_BOOKS_API_KEY);
+export const isGoogleBooksEnabled = Boolean(process.env.BOOKS_API_KEY);
 
 type Volume = {
   id?: string;
@@ -58,8 +58,8 @@ export async function searchGoogleBooks(
   query: string,
   limit = 8
 ): Promise<BookSearchResult[]> {
-  const key = process.env.GOOGLE_BOOKS_API_KEY;
-  if (!key) throw new Error("GOOGLE_BOOKS_API_KEY is not set");
+  const key = process.env.BOOKS_API_KEY;
+  if (!key) throw new Error("BOOKS_API_KEY is not set");
 
   const url =
     `${ENDPOINT}?q=${encodeURIComponent(query)}` +
@@ -84,7 +84,7 @@ export async function searchGoogleBooks(
 export async function getGoogleDescription(
   volumeId: string
 ): Promise<string | null> {
-  const key = process.env.GOOGLE_BOOKS_API_KEY;
+  const key = process.env.BOOKS_API_KEY;
   if (!key) return null;
   try {
     const res = await fetch(
