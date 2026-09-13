@@ -1,8 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, BookOpen, Heart, Library } from "lucide-react";
 import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import { SignInButton } from "@/components/auth/sign-in-button";
+import { BookCoverImage } from "@/components/books/book-cover-image";
 import { BookSearch } from "@/components/books/book-search";
 import { ReadingStatsCharts } from "@/components/books/reading-stats";
 import { StarRatingDisplay } from "@/components/books/star-rating";
@@ -84,18 +84,17 @@ function CurrentBook({ book }: { book: Book }) {
         className="group flex gap-4 p-4 sm:gap-5 sm:p-5"
       >
         <div className="relative aspect-2/3 w-24 shrink-0 overflow-hidden rounded-lg border bg-muted shadow-sm sm:w-32">
-          {cover ? (
-            <Image
-              src={cover}
-              alt=""
-              fill
-              sizes="(max-width: 640px) 96px, 128px"
-              className="object-cover"
-              priority
-            />
-          ) : (
-            <BookOpen className="absolute top-1/2 left-1/2 size-7 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/40" />
-          )}
+          <BookCoverImage
+            src={cover}
+            alt=""
+            fill
+            sizes="(max-width: 640px) 96px, 128px"
+            className="object-cover"
+            priority
+            fallback={
+              <BookOpen className="absolute top-1/2 left-1/2 size-7 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/40" />
+            }
+          />
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col justify-center">

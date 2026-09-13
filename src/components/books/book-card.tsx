@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 import { BookOpen } from "lucide-react";
+import { BookCoverImage } from "@/components/books/book-cover-image";
 import { StarRatingDisplay } from "@/components/books/star-rating";
 import { Badge } from "@/components/ui/badge";
 import { coverUrl, formatDate, STATUS_LABELS, type Status } from "@/lib/books";
@@ -37,23 +37,22 @@ export function BookCard({
         className="focus-visible:ring-ring/50 block rounded-lg focus-visible:ring-[3px] focus-visible:outline-none"
       >
         <div className="card-interactive relative aspect-2/3 w-full overflow-hidden rounded-lg border bg-muted shadow-sm group-hover:shadow-md">
-          {cover ? (
-            <Image
-              src={cover}
-              alt=""
-              fill
-              // 2 cols on phones, up to 4 on desktop — keeps mobile payload small
-              sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 22vw"
-              className="object-cover"
-            />
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-2 p-3 text-center">
-              <BookOpen className="size-7 text-muted-foreground/50" />
-              <span className="line-clamp-3 text-xs text-muted-foreground">
-                {book.title}
-              </span>
-            </div>
-          )}
+          <BookCoverImage
+            src={cover}
+            alt=""
+            fill
+            // 2 cols on phones, up to 4 on desktop — keeps mobile payload small
+            sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 22vw"
+            className="object-cover"
+            fallback={
+              <div className="flex h-full flex-col items-center justify-center gap-2 p-3 text-center">
+                <BookOpen className="size-7 text-muted-foreground/50" />
+                <span className="line-clamp-3 text-xs text-muted-foreground">
+                  {book.title}
+                </span>
+              </div>
+            }
+          />
 
           {status && (
             <Badge
