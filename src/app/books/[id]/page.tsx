@@ -131,12 +131,14 @@ export default async function BookPage({
                 Find on Amazon
               </a>
             </Button>
-            <Button asChild variant="ghost" size="sm">
-              <a href={source.href} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="size-4" />
-                {source.label}
-              </a>
-            </Button>
+            {source && (
+              <Button asChild variant="ghost" size="sm">
+                <a href={source.href} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="size-4" />
+                  {source.label}
+                </a>
+              </Button>
+            )}
           </div>
         </div>
       </section>

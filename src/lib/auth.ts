@@ -41,9 +41,11 @@ export const auth = betterAuth({
   account: {
     accountLinking: {
       enabled: true,
-      // Google verifies its own addresses, so linking to an existing
-      // email/password account of the same address is safe.
-      trustedProviders: ["google"],
+      // Link matching emails based on Google's verified email claim, even
+      // when the existing password account has not verified its email locally.
+      requireLocalEmailVerified: false,
+      // Never bypass the provider's emailVerified check based on its name.
+      trustedProviders: [],
     },
   },
   emailAndPassword: {

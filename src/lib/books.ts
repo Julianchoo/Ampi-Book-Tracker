@@ -108,8 +108,14 @@ export function coverUrl(
     : null;
 }
 
-/** Outbound link to whichever service the book came from. */
-export function sourceUrl(olKey: string): { href: string; label: string } {
+/**
+ * Outbound link to whichever service the book came from. Null for entries
+ * added by hand, which have no page anywhere to link to.
+ */
+export function sourceUrl(
+  olKey: string
+): { href: string; label: string } | null {
+  if (olKey.startsWith("manual:")) return null;
   if (olKey.startsWith("google:")) {
     return {
       href: `https://books.google.com/books?id=${olKey.slice("google:".length)}`,
