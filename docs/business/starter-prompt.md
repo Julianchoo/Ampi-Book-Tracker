@@ -63,7 +63,38 @@ The project already includes several shadcn/ui components (button, dialog, avata
 
 ## What I Want to Build
 
-Basic todo list app with the ability for users to add, remove, update, complete and view todos.
+A reading tracker that helps me keep track of books I read
+I want to be able to start typing a book name or author and get suggestions, sort of like an amazon/google search predicted results, or simply a SERP. I want to be able to add a title to either a wish list or a library. 
+
+Key Sections
+Home
+Should have a large card with the latest book I started, and buttons to either the library or the wishlist
+A small dashboard with key stats about my reading (start with a line chart showing nr of books finished by month, and avg rating)
+
+Library
+Library should have books that I either started and already finished, or ones I started
+If I add them a read, I want to be prompted to optionally, fill out
+- my own rating (1 to 10 stars, in 0.5 star increments)
+- start and end date (get a calendar component)
+- Status (reading, finished, abandoned)
+Library should have a nice layout with a small card for each book, that has the cover, title and author, my star rating, date finished
+Should be sortable and filterable by whatever book attributes are avl, by default should see latest books finished, then started if not finished
+
+Wishlist
+Whatever, make something app
+
+Book Page
+SHould be directed here if i click on the book card, either on the wishilist or the library
+Should see a hero page with book cover and key facts abt the book
+Then description/summary, whatever
+Genre, lang, year, etc
+My own notes
+Link to amazon
+
+This is a mobile first app!
+
+
+Make this super nice and dachs-hund themed, but classy. Logo or main character should be a tiny cute brunette
 
 ## Request
 

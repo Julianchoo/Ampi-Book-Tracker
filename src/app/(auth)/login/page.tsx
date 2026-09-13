@@ -18,16 +18,16 @@ export default async function LoginPage({
   const session = await auth.api.getSession({ headers: await headers() })
 
   if (session) {
-    redirect("/dashboard")
+    redirect("/")
   }
 
   const { reset } = await searchParams
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-4">
+    <div className="flex items-center justify-center p-4 pt-6">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle>Welcome back</CardTitle>
+          <CardTitle className="font-display text-xl">Welcome back</CardTitle>
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center">

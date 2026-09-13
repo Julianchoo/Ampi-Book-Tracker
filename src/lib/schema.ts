@@ -1,4 +1,15 @@
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  index,
+  uniqueIndex,
+  uuid,
+  integer,
+  real,
+  date,
+} from "drizzle-orm/pg-core";
 
 // IMPORTANT! ID fields should ALWAYS use UUID types, EXCEPT the BetterAuth tables.
 
@@ -66,6 +77,52 @@ export const account = pgTable(
   (table) => [
     index("account_user_id_idx").on(table.userId),
     index("account_provider_account_idx").on(table.providerId, table.accountId),
+  ]
+);
+
+/**
+ * A book on one user's shelf, with a snapshot of its Open Library metadata.
+ *
+ * Metadata is denormalised on purpose: Open Library is a remote service that
+ * can be slow or down, and a shelf must still render without it. Only the
+ * long-form description is fetched live (on the book detail page).
+ */
+export const book = pgTable(
+  "book",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+
+    // Open Library snapshot
+    olKey: text("ol_key").notNull(), // e.g. "/works/OL893414W"
+    title: text("title").notNull(),
+    author: text("author"),
+    coverId: integer("cover_id"), // OL cover_i -> covers.openlibrary.org
+    firstPublishYear: integer("first_publish_year"),
+    pages: integer("pages"),
+    language: text("language"),
+    subjects: text("subjects").array(),
+
+    // The user's own data
+    shelf: text("shelf").notNull(), // 'library' | 'wishlist'
+    status: text("status"), // 'reading' | 'finished' | 'abandoned'
+    rating: real("rating"), // 1.0-10.0 in 0.5 steps; halves are exact in binary float
+    startedAt: date("started_at"),
+    finishedAt: date("finished_at"),
+    notes: text("notes"),
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("book_user_shelf_idx").on(table.userId, table.shelf),
+    // Also what lets search mark a result as "already on a shelf"
+    uniqueIndex("book_user_ol_key_idx").on(table.userId, table.olKey),
   ]
 );
 

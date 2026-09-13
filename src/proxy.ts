@@ -21,5 +21,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard", "/chat", "/profile"], // Protected routes
+  // Keep in sync with `protectedRoutes` in src/lib/session.ts
+  matcher: ["/library", "/wishlist", "/books/:path*", "/profile"],
 };

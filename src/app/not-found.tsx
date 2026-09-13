@@ -1,25 +1,24 @@
 import Link from "next/link";
-import { FileQuestion } from "lucide-react";
+import { DachshundSleeping } from "@/components/dachshund";
 import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
   return (
-    <div className="container mx-auto px-4 py-16">
-      <div className="max-w-md mx-auto text-center">
-        <div className="flex justify-center mb-6">
-          <FileQuestion className="h-16 w-16 text-muted-foreground" />
-        </div>
-        <h1 className="text-4xl font-bold mb-4">404</h1>
-        <h2 className="text-xl font-semibold mb-4">Page Not Found</h2>
-        <p className="text-muted-foreground mb-6">
-          The page you&apos;re looking for doesn&apos;t exist or has been moved.
+    <div className="container mx-auto px-4 py-14">
+      <div className="mx-auto flex max-w-md flex-col items-center text-center">
+        <DachshundSleeping className="w-52 text-primary/50" />
+        <h1 className="mt-4 font-display text-3xl font-bold">
+          Nothing on this shelf
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          That page doesn&rsquo;t exist, or the book was taken off the shelf.
         </p>
-        <div className="flex gap-4 justify-center">
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
           <Button asChild>
             <Link href="/">Go home</Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/dashboard">Dashboard</Link>
+            <Link href="/library">My library</Link>
           </Button>
         </div>
       </div>

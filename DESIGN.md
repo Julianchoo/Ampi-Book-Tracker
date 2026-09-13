@@ -10,13 +10,37 @@ This document defines the visual design system for the project. All new componen
 - **Styling:** Tailwind CSS v4 (CSS-first config via `@theme inline` in `globals.css` — no `tailwind.config.ts`)
 - **Components:** shadcn/ui (new-york style, neutral base)
 - **Icons:** Lucide React
-- **Fonts:** Geist (sans) + Geist Mono (mono) via `next/font/google`
+- **Fonts:** Poppins (sans) + Libre Baskerville (serif/display) + IBM Plex Mono, via `next/font/google`
 - **Dark mode:** next-themes (class-based, system default)
 - **Utilities:** `cn()` from `@/lib/utils` (clsx + tailwind-merge)
 
 ---
 
 ## Colors
+
+> **Note.** The palette below is the original neutral starter theme and is
+> **out of date**. The app now runs a warm red/rust theme; the authoritative
+> values live in [`src/app/globals.css`](src/app/globals.css) — read the
+> `:root` and `.dark` blocks there, not this table.
+>
+> Two additions worth knowing about:
+>
+> - `--star` — the rating gold. Deliberately the only warm yellow in the
+>   palette so a filled star never reads as just another rust-coloured thing.
+>   Exposed to Tailwind as `text-star` / `fill-star`.
+> - `--font-display` — maps to the theme serif (Libre Baskerville) and
+>   generates a `font-display` utility. Headings use it; body text does not.
+>
+> **Chart colours must be validated, not eyeballed.** Run the dataviz palette
+> checker against the chart surface before changing `--chart-*`; it checks the
+> lightness band, chroma floor, adjacent-pair colour-vision separation, and
+> contrast. Note also that adjacent slot *order* matters — two otherwise fine
+> colours can fail if they sit next to each other.
+>
+> **Never build a dual-axis chart.** Two measures on independently scaled
+> y-axes is the single most common way a chart lies. Use one shared scale,
+> two charts, or index both to a common base.
+
 
 All values use the **oklch** color space. Colors are defined as CSS custom properties in `globals.css` and bridged to Tailwind via `@theme inline`.
 

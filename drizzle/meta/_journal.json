@@ -15,6 +15,13 @@
       "when": 1766719908715,
       "tag": "0001_last_warpath",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789306654430,
+      "tag": "0002_yummy_unicorn",
+      "breakpoints": true
     }
   ]
 }

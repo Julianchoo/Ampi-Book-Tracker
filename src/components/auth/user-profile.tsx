@@ -20,13 +20,15 @@ export function UserProfile() {
   const router = useRouter();
 
   if (isPending) {
-    return <div>Loading...</div>;
+    // Same footprint as the avatar, so the header doesn't jump on hydration.
+    return <div className="size-8 animate-pulse rounded-full bg-muted" />;
   }
 
   if (!session) {
     return (
-      <div className="flex items-center gap-2">
-        <Link href="/login">
+      <div className="flex items-center gap-1 sm:gap-2">
+        {/* Sign up already links to sign in, so this can go on narrow screens */}
+        <Link href="/login" className="hidden sm:block">
           <Button variant="ghost" size="sm">
             Sign in
           </Button>

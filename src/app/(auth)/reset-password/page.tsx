@@ -15,14 +15,14 @@ export default async function ResetPasswordPage() {
   const session = await auth.api.getSession({ headers: await headers() })
 
   if (session) {
-    redirect("/dashboard")
+    redirect("/")
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-4">
+    <div className="flex items-center justify-center p-4 pt-6">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle>Reset password</CardTitle>
+          <CardTitle className="font-display text-xl">Reset password</CardTitle>
           <CardDescription>Enter your new password below</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center">
