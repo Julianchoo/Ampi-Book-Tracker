@@ -77,7 +77,7 @@ export default async function ProfilePage() {
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <Button asChild variant="outline">
           <Link href="/library">
-            <PawPrint className="size-4" />
+            <PawPrint className="w-5" />
             Go to library
           </Link>
         </Button>

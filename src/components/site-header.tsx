@@ -42,7 +42,7 @@ export async function SiteHeader() {
             className="flex min-w-0 items-center gap-2"
             aria-label="Ampi's Book Tracker — home"
           >
-            <DachshundLogo className="w-9 shrink-0 text-primary sm:w-12" />
+            <DachshundLogo className="w-12 shrink-0 text-primary sm:w-16" />
             <span className="truncate font-display text-base leading-none font-semibold tracking-tight sm:text-xl">
               Ampi&rsquo;s Book Tracker
             </span>
@@ -62,7 +62,7 @@ export async function SiteHeader() {
               </div>
             )}
 
-            <UserProfile />
+            <UserProfile initialUser={session?.user ?? null} />
             <ModeToggle />
 
             {session && (

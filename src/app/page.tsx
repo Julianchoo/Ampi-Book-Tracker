@@ -1,12 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, BookOpen, Heart, Library } from "lucide-react";
+import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import { SignInButton } from "@/components/auth/sign-in-button";
 import { BookSearch } from "@/components/books/book-search";
 import { ReadingStatsCharts } from "@/components/books/reading-stats";
 import { StarRatingDisplay } from "@/components/books/star-rating";
 import { DachshundLogo, DachshundReading, PawPrint } from "@/components/dachshund";
 import { Button } from "@/components/ui/button";
+import { isGoogleEnabled } from "@/lib/auth";
 import { coverUrl, formatDate } from "@/lib/books";
 import { getCurrentlyReading, getStats, type Book } from "@/lib/queries";
 import { getOptionalSession } from "@/lib/session";
@@ -68,7 +70,7 @@ function CurrentBook({ book }: { book: Book }) {
       className="animate-fade-up overflow-hidden rounded-xl border bg-card shadow-sm"
     >
       <div className="flex items-center gap-2 border-b bg-accent/40 px-4 py-2">
-        <PawPrint className="size-3.5 text-primary/60" />
+        <PawPrint className="w-5 text-primary/60" />
         <h2
           id="current-heading"
           className="text-xs font-semibold tracking-wide uppercase"
@@ -146,7 +148,13 @@ function Landing() {
           it, rate it out of ten, and watch your reading year take shape.
         </p>
 
-        <div className="mt-7">
+        <div className="mt-7 flex w-full max-w-sm flex-col items-center gap-4">
+          {isGoogleEnabled && (
+            <>
+              <GoogleButton label="Continue with Google" />
+              <AuthDivider />
+            </>
+          )}
           <SignInButton />
         </div>
 

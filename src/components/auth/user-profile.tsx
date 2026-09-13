@@ -15,16 +15,33 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useSession, signOut } from "@/lib/auth-client";
 
-export function UserProfile() {
+/**
+ * `initialUser` comes from the server, which already resolved the session in
+ * SiteHeader. Without it this component renders a pending state during SSR and
+ * a resolved one on the client's first pass, and React throws the whole tree
+ * away with a hydration mismatch. Seeding it keeps both renders identical and
+ * removes the skeleton flash for signed-in visitors.
+ */
+export type HeaderUser = {
+  name?: string | null | undefined;
+  email?: string | null | undefined;
+  image?: string | null | undefined;
+};
+
+export function UserProfile({
+  initialUser = null,
+}: {
+  initialUser?: HeaderUser | null | undefined;
+}) {
   const { data: session, isPending } = useSession();
   const router = useRouter();
 
-  if (isPending) {
-    // Same footprint as the avatar, so the header doesn't jump on hydration.
-    return <div className="size-8 animate-pulse rounded-full bg-muted" />;
-  }
+  // Trust the server's answer until the client session actually resolves.
+  const user: HeaderUser | null = isPending
+    ? initialUser
+    : (session?.user ?? null);
 
-  if (!session) {
+  if (!user) {
     return (
       <div className="flex items-center gap-1 sm:gap-2">
         {/* Sign up already links to sign in, so this can go on narrow screens */}
@@ -49,29 +66,23 @@ export function UserProfile() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Avatar className="size-8 cursor-pointer hover:opacity-80 transition-opacity">
+        <Avatar className="size-8 cursor-pointer transition-opacity hover:opacity-80">
           <AvatarImage
-            src={session.user?.image || ""}
-            alt={session.user?.name || "User"}
+            src={user.image || ""}
+            alt={user.name || "User"}
             referrerPolicy="no-referrer"
           />
           <AvatarFallback>
-            {(
-              session.user?.name?.[0] ||
-              session.user?.email?.[0] ||
-              "U"
-            ).toUpperCase()}
+            {(user.name?.[0] || user.email?.[0] || "U").toUpperCase()}
           </AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">
-              {session.user?.name}
-            </p>
+            <p className="text-sm leading-none font-medium">{user.name}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {session.user?.email}
+              {user.email}
             </p>
           </div>
         </DropdownMenuLabel>

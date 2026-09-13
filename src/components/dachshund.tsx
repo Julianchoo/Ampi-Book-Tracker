@@ -1,94 +1,60 @@
 import { cn } from "@/lib/utils";
 
 /*
- * Mascot icons.
+ * Mascot marks, all drawn from public/dachshund.png.
  *
- * The dog is `dog-side` from Material Design Icons (Apache License 2.0,
- * https://pictogrammers.com/library/mdi/icon/dog-side/) rather than a drawing
- * of our own — it is a real, maintained icon, and being monochrome it takes
- * the theme colour through `currentColor` like every Lucide icon beside it.
+ * The artwork is a solid black silhouette, which would disappear against the
+ * dark theme if it were dropped in as an <img>. It is used as a CSS mask
+ * instead and painted with `currentColor`, so it inherits `text-primary`,
+ * opacity utilities and dark-mode colours exactly like an inline SVG would —
+ * and the source PNG stays untouched.
+ *
+ * The mask uses a copy trimmed to the artwork's bounding box
+ * (public/dachshund-logo.png, 188x86), so the mark fills its box instead of
+ * floating in the original file's vertical padding.
  */
 
-type IconProps = {
+const MARK_ASPECT = "188 / 86";
+
+const maskStyle: React.CSSProperties = {
+  aspectRatio: MARK_ASPECT,
+  backgroundColor: "currentColor",
+  WebkitMaskImage: "url(/dachshund-logo.png)",
+  maskImage: "url(/dachshund-logo.png)",
+  WebkitMaskRepeat: "no-repeat",
+  maskRepeat: "no-repeat",
+  WebkitMaskPosition: "center",
+  maskPosition: "center",
+  WebkitMaskSize: "contain",
+  maskSize: "contain",
+};
+
+type MarkProps = {
   className?: string | undefined;
   /** Decorative by default; pass a title to expose it to screen readers. */
   title?: string | undefined;
 };
 
-const DOG_PATH =
-  "m19 3l-4 4l3 3l1-1l1 1l2-2l-3-3zM3 7L2 8l3 3v3l-1 1v6h2v-3l2-3h7v6h2V11l-3-3l-1 1H5z";
-
-/** The mascot. Header logo, empty states, and anywhere the dog should appear. */
-export function DachshundLogo({ className, title }: IconProps) {
+/**
+ * The dachshund. Sized by width — height follows from the aspect ratio, so
+ * callers set `w-*` and nothing else.
+ */
+export function DachshundLogo({ className, title }: MarkProps) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-      className={cn("text-primary", className)}
+    <span
+      style={maskStyle}
+      className={cn("inline-block shrink-0 text-primary", className)}
       role={title ? "img" : undefined}
-      aria-hidden={title ? undefined : true}
       aria-label={title}
-    >
-      {title ? <title>{title}</title> : null}
-      <path fill="currentColor" d={DOG_PATH} />
-    </svg>
+      aria-hidden={title ? undefined : true}
+    />
   );
 }
 
-/** Empty state: the dog beside a book. */
-export function DachshundReading({ className, title }: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 44 24"
-      xmlns="http://www.w3.org/2000/svg"
-      className={cn("text-primary", className)}
-      role={title ? "img" : undefined}
-      aria-hidden={title ? undefined : true}
-      aria-label={title}
-    >
-      {title ? <title>{title}</title> : null}
-      <path fill="currentColor" d={DOG_PATH} />
-      {/* open book, sitting on the same baseline as the dog's paws */}
-      <g
-        transform="translate(25 9)"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.75"
-      >
-        <path d="M0 2.5c2.2-1.2 4.4-1.2 6.6 0c2.2-1.2 4.4-1.2 6.6 0v9c-2.2-1.2-4.4-1.2-6.6 0c-2.2-1.2-4.4-1.2-6.6 0z" />
-        <path d="M6.6 2.5v9" />
-      </g>
-    </svg>
-  );
-}
-
-/** Empty state / 404: the dog with sleep marks. */
-export function DachshundSleeping({ className, title }: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 34 24"
-      xmlns="http://www.w3.org/2000/svg"
-      className={cn("text-primary", className)}
-      role={title ? "img" : undefined}
-      aria-hidden={title ? undefined : true}
-      aria-label={title}
-    >
-      {title ? <title>{title}</title> : null}
-      <path fill="currentColor" d={DOG_PATH} />
-      <g fill="currentColor" fontWeight="700" opacity="0.6">
-        <text x="23" y="9" fontSize="6">
-          z
-        </text>
-        <text x="28" y="5" fontSize="4.5">
-          z
-        </text>
-      </g>
-    </svg>
-  );
-}
+// The empty states and 404 use the same mark; kept as named exports so call
+// sites read as what they mean rather than all saying "logo".
+export const DachshundReading = DachshundLogo;
+export const DachshundSleeping = DachshundLogo;
 
 /** Waddling in place. Loading states. */
 export function DachshundLoading({
@@ -102,7 +68,7 @@ export function DachshundLoading({
     <div role="status" className="flex flex-col items-center gap-3">
       <DachshundLogo
         className={cn(
-          "w-16 origin-bottom animate-waddle motion-reduce:animate-none",
+          "w-24 origin-bottom animate-waddle motion-reduce:animate-none",
           className
         )}
       />
@@ -111,28 +77,14 @@ export function DachshundLoading({
   );
 }
 
-/** Paw print. Bullets and small accents. Drawn here — Lucide's PawPrint is a
- *  multi-path icon we only need as a solid glyph. */
+/** Small accent mark, e.g. section bullets. Same dog, small. */
 export function PawPrint({ className }: { className?: string | undefined }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      aria-hidden="true"
-    >
-      <ellipse cx="6.5" cy="9" rx="2.6" ry="3.4" />
-      <ellipse cx="12" cy="6.6" rx="2.7" ry="3.6" />
-      <ellipse cx="17.5" cy="9" rx="2.6" ry="3.4" />
-      <path d="M12 12c3.4 0 6 2.4 6 5 0 2-1.7 3.2-3.6 2.7-1.6-.5-3.2-.5-4.8 0C7.7 20.2 6 19 6 17c0-2.6 2.6-5 6-5Z" />
-    </svg>
-  );
+  return <DachshundLogo className={cn("w-4", className)} />;
 }
 
 /**
- * Reading-progress bar: the dog trots along as you get further through a book.
- * `value` is 0-100.
+ * Reading-progress bar: the dachshund trots along as you get further through
+ * a book. `value` is 0-100.
  */
 export function ReadingProgress({
   value,
@@ -157,7 +109,7 @@ export function ReadingProgress({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <DachshundLogo className="w-6 shrink-0 text-primary" />
+      <DachshundLogo className="w-9" />
     </div>
   );
 }

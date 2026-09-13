@@ -1,5 +1,6 @@
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
+import { AuthDivider, GoogleButton } from "@/components/auth/google-button"
 import { SignInButton } from "@/components/auth/sign-in-button"
 import {
   Card,
@@ -8,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { auth } from "@/lib/auth"
+import { auth, isGoogleEnabled } from "@/lib/auth"
 
 export default async function LoginPage({
   searchParams,
@@ -30,11 +31,17 @@ export default async function LoginPage({
           <CardTitle className="font-display text-xl">Welcome back</CardTitle>
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col items-center">
+        <CardContent className="flex flex-col items-center gap-4">
           {reset === "success" && (
             <p className="mb-4 text-sm text-green-600 dark:text-green-400">
               Password reset successfully. Please sign in with your new password.
             </p>
+          )}
+          {isGoogleEnabled && (
+            <>
+              <GoogleButton label="Sign in with Google" />
+              <AuthDivider />
+            </>
           )}
           <SignInButton />
         </CardContent>
