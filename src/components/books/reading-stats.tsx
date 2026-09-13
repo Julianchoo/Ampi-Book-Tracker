@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/chart";
 import { MAX_RATING } from "@/lib/books";
 import type { ReadingStats } from "@/lib/queries";
+import { cn } from "@/lib/utils";
 
 /*
  * One chart, two marks, and deliberately ONE y-axis.
@@ -33,6 +34,14 @@ import type { ReadingStats } from "@/lib/queries";
 const chartConfig = {
   finished: { label: "Books finished", color: "var(--chart-1)" },
   avgRating: { label: "Average rating", color: "var(--star)" },
+} satisfies ChartConfig;
+
+// Second chart: both series are measured in pages, so one scale is honest —
+// and the average per book is by definition inside the month's total.
+const pagesConfig = {
+  pages: { label: "Pages read", color: "var(--chart-4)" },
+  // Black on light, white on dark: the one series that isn't a rust colour.
+  avgPages: { label: "Average pages per book", color: "var(--foreground)" },
 } satisfies ChartConfig;
 
 /** "2026-03" -> "Mar 26" */
@@ -66,14 +75,57 @@ function StatTile({
   );
 }
 
+/* Two buttons rather than tabs: there is no second panel, only one set of
+ * numbers that changes underneath. aria-pressed says exactly that. */
+function RangeToggle({
+  year,
+  value,
+  onChange,
+}: {
+  year: number;
+  value: boolean;
+  onChange: (yearOnly: boolean) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Time range"
+      className="inline-flex rounded-md border bg-card p-0.5 shadow-xs"
+    >
+      {[
+        { label: "All time", yearOnly: false },
+        { label: String(year), yearOnly: true },
+      ].map((o) => (
+        <button
+          key={o.label}
+          type="button"
+          aria-pressed={value === o.yearOnly}
+          onClick={() => onChange(o.yearOnly)}
+          className={cn(
+            "rounded-sm px-3 py-1 text-xs font-medium transition-colors",
+            value === o.yearOnly
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-accent"
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function ReadingStatsCharts({ stats }: { stats: ReadingStats }) {
+  const [yearOnly, setYearOnly] = React.useState(false);
+  const totals = yearOnly ? stats.thisYear : stats.allTime;
+  const prefix = `${stats.year}-`;
+
   const data = React.useMemo(
     () =>
-      stats.byMonth.map((m) => ({
-        ...m,
-        label: monthLabel(m.month),
-      })),
-    [stats.byMonth]
+      stats.byMonth
+        .filter((m) => !yearOnly || m.month.startsWith(prefix))
+        .map((m) => ({ ...m, label: monthLabel(m.month) })),
+    [stats.byMonth, yearOnly, prefix]
   );
 
   // One shared scale. 10 is the rating ceiling and also covers a normal
@@ -85,25 +137,36 @@ export function ReadingStatsCharts({ stats }: { stats: ReadingStats }) {
 
   return (
     <section aria-labelledby="stats-heading" className="space-y-4">
-      <h2 id="stats-heading" className="font-display text-xl font-semibold">
-        Your reading
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="stats-heading" className="font-display text-xl font-semibold">
+          Your reading
+        </h2>
+        <RangeToggle year={stats.year} value={yearOnly} onChange={setYearOnly} />
+      </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Finished" value={String(stats.totalFinished)} />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <StatTile label="Finished" value={String(totals.finished)} />
         <StatTile label="Reading now" value={String(stats.totalReading)} />
         <StatTile
+          label="Pages read"
+          value={totals.pages.toLocaleString("en-GB")}
+          {...(totals.avgPages != null
+            ? { sub: `${Math.round(totals.avgPages)} per book` }
+            : {})}
+        />
+        <StatTile
           label="Average rating"
-          value={stats.avgRating != null ? stats.avgRating.toFixed(1) : "—"}
-          {...(stats.avgRating != null ? { sub: `out of ${MAX_RATING}` } : {})}
+          value={totals.avgRating != null ? totals.avgRating.toFixed(1) : "—"}
+          {...(totals.avgRating != null ? { sub: `out of ${MAX_RATING}` } : {})}
         />
         <StatTile label="On wishlist" value={String(stats.wishlistCount)} />
       </div>
 
       {data.length === 0 ? (
         <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-          Finish a book and give it a date — your reading year will start
-          drawing itself here.
+          {yearOnly
+            ? `Nothing finished in ${stats.year} yet — switch to All time to see earlier years.`
+            : "Finish a book and give it a date — your reading year will start drawing itself here."}
         </p>
       ) : (
         <div className="min-w-0 rounded-lg border bg-card p-3 shadow-sm sm:p-4">
@@ -171,6 +234,72 @@ export function ReadingStatsCharts({ stats }: { stats: ReadingStats }) {
         </div>
       )}
 
+      {data.length > 0 && (
+        <div className="min-w-0 rounded-lg border bg-card p-3 shadow-sm sm:p-4">
+          <h3 className="text-sm font-semibold">
+            Pages read and average pages per book by month
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Both series are pages, on one scale. Books with no page count are
+            counted as zero.
+          </p>
+          <ChartContainer
+            config={pagesConfig}
+            className="mt-2 h-[260px] w-full"
+          >
+            <ResponsiveContainer>
+              <ComposedChart
+                data={data}
+                margin={{ top: 8, right: 12, bottom: 0, left: -6 }}
+              >
+                <CartesianGrid vertical={false} strokeOpacity={0.4} />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  fontSize={11}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tickLine={false}
+                  axisLine={false}
+                  width={52}
+                  fontSize={11}
+                />
+                <ChartTooltip
+                  cursor={{ fillOpacity: 0.08 }}
+                  content={<ChartTooltipContent />}
+                />
+                <Legend
+                  verticalAlign="bottom"
+                  height={28}
+                  iconType="circle"
+                  wrapperStyle={{ fontSize: 12 }}
+                />
+                <Bar
+                  dataKey="pages"
+                  name="Pages read"
+                  fill="var(--color-pages)"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={44}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="avgPages"
+                  name="Average pages per book"
+                  stroke="var(--color-avgPages)"
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                  activeDot={{ r: 6 }}
+                  connectNulls
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+        </div>
+      )}
+
       {/* Colour is never the only channel: the same numbers, readable. */}
       {data.length > 0 && (
         <details className="rounded-lg border bg-card px-4 py-3 text-sm shadow-sm">
@@ -183,7 +312,9 @@ export function ReadingStatsCharts({ stats }: { stats: ReadingStats }) {
                 <tr>
                   <th scope="col" className="py-1 pr-4 font-medium">Month</th>
                   <th scope="col" className="py-1 pr-4 font-medium">Finished</th>
-                  <th scope="col" className="py-1 font-medium">Avg rating</th>
+                  <th scope="col" className="py-1 pr-4 font-medium">Avg rating</th>
+                  <th scope="col" className="py-1 pr-4 font-medium">Pages</th>
+                  <th scope="col" className="py-1 font-medium">Avg pages</th>
                 </tr>
               </thead>
               <tbody>
@@ -191,8 +322,14 @@ export function ReadingStatsCharts({ stats }: { stats: ReadingStats }) {
                   <tr key={d.month} className="border-t">
                     <td className="py-1 pr-4">{d.label}</td>
                     <td className="py-1 pr-4 tabular-nums">{d.finished}</td>
-                    <td className="py-1 tabular-nums">
+                    <td className="py-1 pr-4 tabular-nums">
                       {d.avgRating != null ? d.avgRating.toFixed(1) : "—"}
+                    </td>
+                    <td className="py-1 pr-4 tabular-nums">
+                      {d.pages.toLocaleString("en-GB")}
+                    </td>
+                    <td className="py-1 tabular-nums">
+                      {d.avgPages != null ? Math.round(d.avgPages) : "—"}
                     </td>
                   </tr>
                 ))}

@@ -25,7 +25,7 @@ export default async function ProfilePage() {
   });
 
   const figures = [
-    { label: "Books finished", value: stats.totalFinished },
+    { label: "Books finished", value: stats.allTime.finished },
     { label: "Currently reading", value: stats.totalReading },
     { label: "On the wishlist", value: stats.wishlistCount },
   ];

@@ -59,6 +59,8 @@ function DateField({
 }) {
   const [open, setOpen] = React.useState(false);
   const selected = parseDateString(value);
+  // One instance, so "after today" and the last selectable month agree.
+  const today = React.useMemo(() => new Date(), []);
 
   return (
     <div className="space-y-2">
@@ -83,7 +85,12 @@ function DateField({
               // treats an explicit `undefined` as a type error here.
               {...(selected ? { selected, defaultMonth: selected } : {})}
               autoFocus
-              disabled={{ after: new Date() }}
+              // Month and year dropdowns, not 30 clicks on the back chevron:
+              // a book finished three years ago is two taps away.
+              captionLayout="dropdown"
+              startMonth={new Date(today.getFullYear() - 50, 0)}
+              endMonth={today}
+              disabled={{ after: today }}
               onSelect={(d) => {
                 onChange(d ? toDateString(d) : null);
                 setOpen(false);
@@ -153,14 +160,17 @@ export function BookDetailsForm({
       finishedAt,
       notes: notes.trim() || null,
     });
-    setSaving(false);
-
     if (!result.ok) {
+      setSaving(false);
       toast.error(result.error);
       return;
     }
     toast.success("Saved");
-    router.refresh();
+    // Back to whichever shelf the book ended up on — finishing a wishlist book
+    // moves it, so `book.shelf` from the server render can already be stale.
+    // `saving` deliberately stays true: the form is on its way out, and
+    // re-enabling the button would flash a "Save changes" state that isn't.
+    router.push(result.shelf === "wishlist" ? "/wishlist" : "/library");
   }
 
   return (
@@ -215,7 +225,13 @@ export function BookDetailsForm({
           <DateField
             label="Finished"
             value={finishedAt}
-            onChange={setFinishedAt}
+            onChange={(v) => {
+              setFinishedAt(v);
+              // A date in the Finished box means finished. Flip the dropdown
+              // here rather than server-side so you can see it happen — and
+              // can still override it before saving.
+              if (v) setStatus("finished");
+            }}
           />
         </div>
         {datesInvalid && (

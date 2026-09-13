@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { ratingSchema, shelfSchema, statusSchema } from "@/lib/books";
+import { ratingSchema, shelfSchema, statusSchema, type Shelf } from "@/lib/books";
 import { SOURCES } from "@/lib/books";
 import { db } from "@/lib/db";
 import { book } from "@/lib/schema";
@@ -94,11 +94,14 @@ export async function addBook(
   return { ok: true, id: row.id };
 }
 
-/** Edit the user's own fields on a book: rating, dates, status, notes, shelf. */
+/**
+ * Edit the user's own fields on a book: rating, dates, status, notes, shelf.
+ * Returns the shelf the book ended up on — finishing can move it.
+ */
 export async function updateBook(
   id: string,
   input: unknown
-): Promise<ActionResult> {
+): Promise<{ ok: true; shelf: Shelf } | { ok: false; error: string }> {
   const session = await requireAuth();
   if (!z.string().uuid().safeParse(id).success) {
     return { ok: false, error: "Unknown book." };
@@ -111,15 +114,27 @@ export async function updateBook(
 
   const values = { ...parsed.data, updatedAt: new Date() };
 
-  // Finishing a book without a date is the common case — fill it in rather
-  // than leaving a finished book that sorts to the bottom of the library.
-  if (parsed.data.status === "finished" && parsed.data.finishedAt === undefined) {
+  // A finish date means the book is finished. An explicit status in the same
+  // call still wins — someone marking a book abandoned on the day they gave up
+  // means abandoned.
+  if (parsed.data.finishedAt && parsed.data.status === undefined) {
+    values.status = "finished";
+  }
+
+  if (values.status === "finished") {
     const [current] = await db
-      .select({ finishedAt: book.finishedAt })
+      .select({ finishedAt: book.finishedAt, shelf: book.shelf })
       .from(book)
       .where(and(eq(book.id, id), eq(book.userId, session.user.id)));
-    if (current && !current.finishedAt) {
+
+    // Finishing without a date is the common case — fill it in rather than
+    // leaving a finished book that sorts to the bottom of the library.
+    if (current && !current.finishedAt && parsed.data.finishedAt === undefined) {
       values.finishedAt = new Date().toISOString().slice(0, 10);
+    }
+    // You can't finish a book you only wished for: it's read, so it's shelved.
+    if (current?.shelf === "wishlist" && values.shelf === undefined) {
+      values.shelf = "library";
     }
   }
 
@@ -127,11 +142,11 @@ export async function updateBook(
     .update(book)
     .set(values)
     .where(and(eq(book.id, id), eq(book.userId, session.user.id)))
-    .returning({ id: book.id });
+    .returning({ shelf: book.shelf });
 
-  if (updated.length === 0) return { ok: false, error: "Unknown book." };
+  if (!updated[0]) return { ok: false, error: "Unknown book." };
   refresh(id);
-  return { ok: true };
+  return { ok: true, shelf: updated[0].shelf as Shelf };
 }
 
 /** Move a wishlist book onto the library shelf and start reading it today. */
