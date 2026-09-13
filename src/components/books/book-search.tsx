@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { BookOpen, Heart, Library, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
+import { BookCoverImage } from "@/components/books/book-cover-image";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -192,17 +192,16 @@ export function BookSearch({ className }: { className?: string | undefined }) {
                       className="flex items-start gap-3.5 rounded-lg px-2 py-3"
                     >
                       <div className="relative h-[5.5rem] w-[3.75rem] shrink-0 overflow-hidden rounded-md border bg-muted shadow-sm">
-                        {cover ? (
-                          <Image
-                            src={cover}
-                            alt=""
-                            fill
-                            sizes="60px"
-                            className="object-cover"
-                          />
-                        ) : (
-                          <BookOpen className="absolute top-1/2 left-1/2 size-5 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/50" />
-                        )}
+                        <BookCoverImage
+                          src={cover}
+                          alt=""
+                          fill
+                          sizes="60px"
+                          className="object-cover"
+                          fallback={
+                            <BookOpen className="absolute top-1/2 left-1/2 size-5 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                          }
+                        />
                       </div>
 
                       <div className="min-w-0 flex-1">

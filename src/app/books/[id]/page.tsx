@@ -1,8 +1,8 @@
 import { Suspense } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BookOpen, ExternalLink, Heart, Library } from "lucide-react";
+import { BookCoverImage } from "@/components/books/book-cover-image";
 import { BookDetailsForm } from "@/components/books/book-details-form";
 import { StarRatingDisplay } from "@/components/books/star-rating";
 import { Badge } from "@/components/ui/badge";
@@ -69,18 +69,17 @@ export default async function BookPage({
       {/* Hero */}
       <section className="flex flex-col gap-5 sm:flex-row sm:gap-7">
         <div className="relative mx-auto aspect-2/3 w-40 shrink-0 overflow-hidden rounded-lg border bg-muted shadow-md sm:mx-0 sm:w-52">
-          {cover ? (
-            <Image
-              src={cover}
-              alt={`Cover of ${book.title}`}
-              fill
-              sizes="(max-width: 640px) 160px, 208px"
-              className="object-cover"
-              priority
-            />
-          ) : (
-            <BookOpen className="absolute top-1/2 left-1/2 size-10 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/40" />
-          )}
+          <BookCoverImage
+            src={cover}
+            alt={`Cover of ${book.title}`}
+            fill
+            sizes="(max-width: 640px) 160px, 208px"
+            className="object-cover"
+            priority
+            fallback={
+              <BookOpen className="absolute top-1/2 left-1/2 size-10 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/40" />
+            }
+          />
         </div>
 
         <div className="min-w-0 flex-1">
