@@ -9,7 +9,7 @@ import { StarRatingDisplay } from "@/components/books/star-rating";
 import { DachshundLogo, DachshundReading, PawPrint } from "@/components/dachshund";
 import { Button } from "@/components/ui/button";
 import { isGoogleEnabled } from "@/lib/auth";
-import { coverUrl, formatDate } from "@/lib/books";
+import { coverUrls, formatDate } from "@/lib/books";
 import { getCurrentlyReading, getStats, type Book } from "@/lib/queries";
 import { getOptionalSession } from "@/lib/session";
 
@@ -61,7 +61,7 @@ export default async function HomePage() {
 
 /** The hero: the book you most recently picked up. */
 function CurrentBook({ book }: { book: Book }) {
-  const cover = coverUrl(book.olKey, book.coverId, "L");
+  const cover = coverUrls(book.olKey, book.coverId, "L");
   const started = formatDate(book.startedAt);
 
   return (

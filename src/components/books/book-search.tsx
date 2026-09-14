@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { addBook } from "@/lib/actions/books";
-import { coverUrl, type Shelf } from "@/lib/books";
+import { coverUrls, type Shelf } from "@/lib/books";
 import { cn } from "@/lib/utils";
 
 type Hit = {
@@ -181,7 +181,7 @@ export function BookSearch({ className }: { className?: string | undefined }) {
             {hits.length > 0 && (
               <CommandGroup>
                 {hits.map((hit) => {
-                  const cover = coverUrl(hit.olKey, hit.coverId, "S");
+                  const cover = coverUrls(hit.olKey, hit.coverId, "S");
                   const busy = pending === hit.olKey;
                   return (
                     <CommandItem

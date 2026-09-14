@@ -77,35 +77,69 @@ export const ratingSchema = z
     message: `Rating must be in steps of ${RATING_STEP}`,
   });
 
-// Google's content endpoint returns a real (200 OK) "image not available"
-// graphic — not an error — for plenty of in-print catalog entries once you
-// ask for zoom 2+, even though zoom 1 resolves fine for the same volume.
-// There is no way to tell from the id alone which zooms a given book
-// supports, so every size asks for the one zoom level that's reliable.
-const GOOGLE_ZOOM = { S: 1, M: 1, L: 1 } as const;
+export type CoverSize = "S" | "M" | "L";
+
+/*
+ * Open Library serves a fixed three-rung ladder and tops out near 500px, so
+ * there is nothing to negotiate — but its rungs are small, and S is a 39px
+ * thumbnail. Ask one size above the display box so the cover still holds
+ * together on a 2x screen.
+ */
+const OL_SIZE: Record<CoverSize, CoverSize> = { S: "M", M: "L", L: "L" };
 
 /**
- * Cover URL, derived from the provider key rather than stored.
+ * Cover candidates, sharpest first — try each until one loads.
  *
- * Google's cover CDN is addressable by volume id and needs no API key, so a
- * Google book's cover needs no column of its own; Open Library's is built from
- * its numeric cover id.
+ * Derived from the provider key rather than stored. Google's cover CDN is
+ * addressable by volume id and needs no API key, so a Google book's cover
+ * needs no column of its own; Open Library's is built from its numeric cover
+ * id. Empty means this book has no cover anywhere.
  */
-export function coverUrl(
+export function coverUrls(
   olKey: string,
   coverId: number | null | undefined,
-  size: "S" | "M" | "L" = "M"
-): string | null {
+  size: CoverSize = "M"
+): string[] {
   if (olKey.startsWith("google:")) {
-    const id = olKey.slice("google:".length);
-    return (
-      `https://books.google.com/books/content?id=${encodeURIComponent(id)}` +
-      `&printsec=frontcover&img=1&zoom=${GOOGLE_ZOOM[size]}`
-    );
+    // One candidate, because the hard part is settled server-side: Google
+    // hands out stand-in graphics with a 200 and only the byte count gives
+    // them away, so /api/cover picks the sharpest zoom that is really there.
+    return [`/api/cover/${encodeURIComponent(olKey.slice("google:".length))}`];
   }
   return coverId
-    ? `https://covers.openlibrary.org/b/id/${coverId}-${size}.jpg`
-    : null;
+    ? [`https://covers.openlibrary.org/b/id/${coverId}-${OL_SIZE[size]}.jpg`]
+    : [];
+}
+
+/**
+ * Does an image that loaded actually look like a book cover?
+ *
+ * Both providers answer 200 with something that isn't a cover when they have
+ * nothing to give: Google serves a wide "image not available" strip (575x92,
+ * 300x48, 800x128 measured) and Open Library a 43-byte blank. Real covers are
+ * portrait — 1.5 is a deliberately loose bar, since a square-ish cover like
+ * Open Library's 465x475 is unusual but real, and Google's strip is ~6:1.
+ */
+export function looksLikeCover(width: number, height: number): boolean {
+  return width >= 16 && width <= height * 1.5;
+}
+
+/**
+ * Index of the candidate to try after `failed` let us down.
+ *
+ * Keyed to the candidate that actually failed rather than being a blind
+ * increment, because next/image can report load or error twice for the same
+ * element — once from its ref when the bitmap is already cached, once from
+ * the native event. A blind +1 skipped a rung on the second report and
+ * dropped straight to the empty state, which hit precisely the books that
+ * needed to step down at all.
+ */
+export function stepPastCandidate(
+  candidates: string[],
+  index: number,
+  failed: string
+): number {
+  return candidates[index] === failed ? index + 1 : index;
 }
 
 /**

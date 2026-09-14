@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   amazonUrl,
-  coverUrl,
+  coverUrls,
   formatDate,
   languageName,
   sourceUrl,
@@ -44,7 +44,7 @@ export default async function BookPage({
   const book = await getBook(session.user.id, id);
   if (!book) notFound();
 
-  const cover = coverUrl(book.olKey, book.coverId, "L");
+  const cover = coverUrls(book.olKey, book.coverId, "L");
   const status = book.status as Status | null;
   const source = sourceUrl(book.olKey);
   const subjects = book.subjects ?? [];
