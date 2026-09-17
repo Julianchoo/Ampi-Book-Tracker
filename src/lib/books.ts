@@ -74,7 +74,11 @@ export const DEFAULT_SORT: Record<Shelf, SortKey> = { library: "recent", wishlis
 export const VIEWS = ["grid", "wall"] as const;
 export type View = (typeof VIEWS)[number];
 
-/** Below this many Open Library ratings an average is noise ("5.0 from 1"). */
+/**
+ * Below this many Open Library ratings an average is noise ("5.0 from 1"), so
+ * it doesn't drive the community sort or the "best rated" highlight. Cards and
+ * the book page still display it with its count.
+ */
 export const MIN_COMMUNITY_RATINGS = 5;
 
 export const shelfSchema = z.enum(SHELVES);

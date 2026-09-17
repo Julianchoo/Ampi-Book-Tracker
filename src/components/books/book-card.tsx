@@ -126,7 +126,11 @@ export function BookCard({
           </p>
         )}
         {showCommunityRating && (
-          <CommunityRating rating={book.olRating} count={book.olRatingCount} />
+          <CommunityRating
+            rating={book.olRating}
+            count={book.olRatingCount}
+            checked={book.olRatingCheckedAt != null}
+          />
         )}
         {/* mt-auto pins actions to the bottom so a row's buttons line up. */}
         {action && <div className="mt-auto pt-2">{action}</div>}

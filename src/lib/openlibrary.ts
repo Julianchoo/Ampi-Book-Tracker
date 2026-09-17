@@ -175,9 +175,12 @@ export type CommunityRating = { average: number | null; count: number };
 /**
  * The free-text query. Structured `title=`/`author=` search misses subtitled
  * Google titles and matches the wrong work for translations; `q=` gets both.
+ * Parenthetical/bracketed edition noise ("(Pulitzer Prize Winner)") is
+ * stripped — it makes `q=` match nothing.
  */
 export function ratingQuery(title: string, author: string | null | undefined): string {
-  return `${title} ${author ?? ""}`.replace(/\s+/g, " ").trim();
+  const bareTitle = title.replace(/\([^)]*\)|\[[^\]]*\]/g, " ");
+  return `${bareTitle} ${author ?? ""}`.replace(/\s+/g, " ").trim();
 }
 
 /**

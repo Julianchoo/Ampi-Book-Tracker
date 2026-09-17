@@ -9,6 +9,11 @@ test("rating query collapses whitespace and tolerates a missing author", () => {
   assert.equal(ratingQuery("Dune", undefined), "Dune");
 });
 
+test("rating query drops parenthetical and bracketed title segments", () => {
+  assert.equal(ratingQuery("Trust (Pulitzer Prize Winner)", "Hernan Diaz"), "Trust Hernan Diaz");
+  assert.equal(ratingQuery("Dune [Deluxe Edition]", "Frank Herbert"), "Dune Frank Herbert");
+});
+
 test("reads average and count from the first doc", () => {
   assert.deepEqual(parseRatingSearch({ docs: [{ ratings_average: 4.5, ratings_count: 178 }] }), {
     average: 4.5,

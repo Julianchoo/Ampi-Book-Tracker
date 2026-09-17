@@ -22,7 +22,7 @@ import { getDescription } from "@/lib/booksearch";
 import { getBook, getBookCollections, getUserCollections } from "@/lib/queries";
 import { refreshRatings } from "@/lib/ratings";
 import { requireAuth } from "@/lib/session";
-import { hasCommunityRating, pickStaleForRating } from "@/lib/shelf";
+import { pickStaleForRating } from "@/lib/shelf";
 import type { Metadata } from "next";
 
 type Params = { params: Promise<{ id: string }> };
@@ -75,7 +75,7 @@ export default async function BookPage({
   const facts = [
     book.firstPublishYear && { label: "First published", value: String(book.firstPublishYear) },
     book.pages && { label: "Pages", value: String(book.pages) },
-    hasCommunityRating(book) && {
+    book.olRating != null && (book.olRatingCount ?? 0) >= 1 && {
       label: "Community rating",
       value: `${book.olRating!.toFixed(1)}/5 (${book.olRatingCount!.toLocaleString("en-GB")})`,
     },
