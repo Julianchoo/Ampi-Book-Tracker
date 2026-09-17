@@ -1,8 +1,8 @@
 import { cache } from "react";
 import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
-import type { Shelf, SortKey, Status } from "@/lib/books";
+import { MIN_COMMUNITY_RATINGS, type Shelf, type SortKey, type Status } from "@/lib/books";
 import { db } from "@/lib/db";
-import { book } from "@/lib/schema";
+import { book, bookCollection, collection } from "@/lib/schema";
 
 export type Book = typeof book.$inferSelect;
 
@@ -23,7 +23,97 @@ const ORDER_BY: Record<SortKey, SQL[]> = {
   rating: [sql`${book.rating} DESC NULLS LAST`, asc(book.title)],
   added: [desc(book.createdAt)],
   year: [sql`${book.firstPublishYear} DESC NULLS LAST`, asc(book.title)],
+  // A 5.0 from two ratings says nothing; below the threshold a book sorts as unrated.
+  community: [
+    sql`case when ${book.olRatingCount} >= ${MIN_COMMUNITY_RATINGS} then ${book.olRating} end DESC NULLS LAST`,
+    asc(book.title),
+  ],
 };
+
+export type ShelfBookRow = Book & { collectionIds: string[] };
+export type CollectionOption = { id: string; name: string };
+
+/**
+ * A whole shelf plus each book's collections, sorted in SQL. Filtering happens
+ * in JS (src/lib/shelf.ts) because counts, subject facets and highlights all
+ * need the unfiltered shelf anyway.
+ * ponytail: whole shelf in memory; push filters into SQL if a shelf reaches thousands.
+ */
+export async function getShelfView(
+  userId: string,
+  shelf: Shelf,
+  sort: SortKey
+): Promise<{
+  books: ShelfBookRow[];
+  /** Collections with at least one book on THIS shelf, by name. */
+  collections: CollectionOption[];
+}> {
+  const [rows, memberships] = await Promise.all([
+    db
+      .select()
+      .from(book)
+      .where(and(eq(book.userId, userId), eq(book.shelf, shelf)))
+      .orderBy(...ORDER_BY[sort]),
+    db
+      .select({
+        bookId: bookCollection.bookId,
+        collectionId: collection.id,
+        name: collection.name,
+      })
+      .from(bookCollection)
+      .innerJoin(collection, eq(collection.id, bookCollection.collectionId))
+      .innerJoin(book, eq(book.id, bookCollection.bookId))
+      .where(
+        and(
+          eq(collection.userId, userId),
+          eq(book.userId, userId),
+          eq(book.shelf, shelf)
+        )
+      ),
+  ]);
+
+  const idsByBook = new Map<string, string[]>();
+  const names = new Map<string, string>();
+  for (const m of memberships) {
+    const ids = idsByBook.get(m.bookId);
+    if (ids) ids.push(m.collectionId);
+    else idsByBook.set(m.bookId, [m.collectionId]);
+    names.set(m.collectionId, m.name);
+  }
+
+  return {
+    books: rows.map((b) => ({ ...b, collectionIds: idsByBook.get(b.id) ?? [] })),
+    collections: [...names]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
+
+/** Collections this book is in. */
+export async function getBookCollections(
+  userId: string,
+  bookId: string
+): Promise<CollectionOption[]> {
+  return db
+    .select({ id: collection.id, name: collection.name })
+    .from(bookCollection)
+    .innerJoin(collection, eq(collection.id, bookCollection.collectionId))
+    .where(and(eq(bookCollection.bookId, bookId), eq(collection.userId, userId)))
+    .orderBy(sql`lower(${collection.name})`);
+}
+
+/** Every collection that has at least one book (empty ones are hidden, never deleted), by name. */
+export async function getUserCollections(userId: string): Promise<CollectionOption[]> {
+  // GROUP BY the primary key rather than SELECT DISTINCT: Postgres rejects
+  // DISTINCT with an ORDER BY expression (lower(name)) that isn't selected.
+  return db
+    .select({ id: collection.id, name: collection.name })
+    .from(collection)
+    .innerJoin(bookCollection, eq(bookCollection.collectionId, collection.id))
+    .where(eq(collection.userId, userId))
+    .groupBy(collection.id)
+    .orderBy(sql`lower(${collection.name})`);
+}
 
 export async function getShelf(
   userId: string,

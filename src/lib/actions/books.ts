@@ -1,13 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ratingSchema, shelfSchema, statusSchema, type Shelf } from "@/lib/books";
 import { SOURCES } from "@/lib/books";
 import { db } from "@/lib/db";
+import { refreshRatings } from "@/lib/ratings";
 import { book } from "@/lib/schema";
 import { requireAuth } from "@/lib/session";
+import { pickStaleForRating } from "@/lib/shelf";
 
 /*
  * Every statement below is scoped by `userId` as well as `id`. A bare
@@ -87,9 +90,15 @@ export async function addBook(
       target: [book.userId, book.olKey],
       set: { shelf: d.shelf, updatedAt: new Date() },
     })
-    .returning({ id: book.id });
+    .returning({ id: book.id, olRatingCheckedAt: book.olRatingCheckedAt });
 
   if (!row) return { ok: false, error: "Couldn't save that book." };
+  // Re-adding a book already on a shelf upserts the same row; skip the lookup if it's fresh.
+  if (pickStaleForRating([row]).length > 0) {
+    const userId = session.user.id;
+    const target = { id: row.id, title: d.title, author: d.author ?? null };
+    after(() => refreshRatings(userId, [target]));
+  }
   refresh(row.id);
   return { ok: true, id: row.id };
 }

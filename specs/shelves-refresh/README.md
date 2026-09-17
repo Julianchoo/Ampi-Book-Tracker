@@ -56,10 +56,10 @@ Transient type errors between waves are expected: task-02 adds a `community` sor
 - [x] [task-03-openlibrary-rating](./tasks/task-03-openlibrary-rating.md) — Open Library community rating client
 
 ### Wave 2
-- [ ] [task-04-queries-ratings](./tasks/task-04-queries-ratings.md) — Shelf view queries + background rating refresh
-- [ ] [task-05-collection-actions](./tasks/task-05-collection-actions.md) — Collection server actions
-- [ ] [task-06-shelf-components](./tasks/task-06-shelf-components.md) — Book card, community rating, highlights, shelf grid
-- [ ] [task-07-shelf-toolbar](./tasks/task-07-shelf-toolbar.md) — Status chips, filters, view toggle
+- [x] [task-04-queries-ratings](./tasks/task-04-queries-ratings.md) — Shelf view queries + background rating refresh
+- [x] [task-05-collection-actions](./tasks/task-05-collection-actions.md) — Collection server actions
+- [x] [task-06-shelf-components](./tasks/task-06-shelf-components.md) — Book card, community rating, highlights, shelf grid
+- [x] [task-07-shelf-toolbar](./tasks/task-07-shelf-toolbar.md) — Status chips, filters, view toggle
 
 ### Wave 3
 - [ ] [task-08-book-page](./tasks/task-08-book-page.md) — Book page: collections picker, rating fact, author link
