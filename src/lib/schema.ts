@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -9,6 +10,7 @@ import {
   integer,
   real,
   date,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 // IMPORTANT! ID fields should ALWAYS use UUID types, EXCEPT the BetterAuth tables.
@@ -112,6 +114,11 @@ export const book = pgTable(
     description: text("description"),
     // Which service olKey came from: "openlibrary" or "google".
     source: text("source").notNull().default("openlibrary"),
+    // Open Library community rating, cached: the service is too slow to ask
+    // during render. checkedAt null = never looked up.
+    olRating: real("ol_rating"), // 1-5 average, null when no ratings
+    olRatingCount: integer("ol_rating_count"),
+    olRatingCheckedAt: timestamp("ol_rating_checked_at"),
 
     // The user's own data
     shelf: text("shelf").notNull(), // 'library' | 'wishlist'
@@ -131,6 +138,39 @@ export const book = pgTable(
     index("book_user_shelf_idx").on(table.userId, table.shelf),
     // Also what lets search mark a result as "already on a shelf"
     uniqueIndex("book_user_ol_key_idx").on(table.userId, table.olKey),
+  ]
+);
+
+/** A user's own grouping of books ("Favourites", "Book club"). Many per book. */
+export const collection = pgTable(
+  "collection",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    // Case-insensitive: "Favourites" and "favourites" are one collection
+    uniqueIndex("collection_user_name_idx").on(table.userId, sql`lower(${table.name})`),
+  ]
+);
+
+export const bookCollection = pgTable(
+  "book_collection",
+  {
+    bookId: uuid("book_id")
+      .notNull()
+      .references(() => book.id, { onDelete: "cascade" }),
+    collectionId: uuid("collection_id")
+      .notNull()
+      .references(() => collection.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.bookId, table.collectionId] }),
+    index("book_collection_collection_idx").on(table.collectionId),
   ]
 );
 

@@ -54,6 +54,7 @@ export const SORTS = {
   finished: "Recently finished",
   added: "Recently added",
   year: "Publication year",
+  community: "Community rating",
 } as const;
 
 export type SortKey = keyof typeof SORTS;
@@ -61,6 +62,20 @@ export type SortKey = keyof typeof SORTS;
 export function isSortKey(v: string | undefined): v is SortKey {
   return !!v && v in SORTS;
 }
+
+/** Which sorts make sense on which shelf — a wishlist book has no finish date or own rating. */
+export const SHELF_SORTS: Record<Shelf, readonly SortKey[]> = {
+  library: ["recent", "title", "author", "rating", "finished", "added", "year"],
+  wishlist: ["added", "title", "author", "community", "year"],
+};
+
+export const DEFAULT_SORT: Record<Shelf, SortKey> = { library: "recent", wishlist: "added" };
+
+export const VIEWS = ["grid", "wall"] as const;
+export type View = (typeof VIEWS)[number];
+
+/** Below this many Open Library ratings an average is noise ("5.0 from 1"). */
+export const MIN_COMMUNITY_RATINGS = 5;
 
 export const shelfSchema = z.enum(SHELVES);
 export const statusSchema = z.enum(STATUSES);

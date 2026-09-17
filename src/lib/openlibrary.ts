@@ -170,6 +170,64 @@ export async function getWorkDetail(olKey: string): Promise<WorkDetail> {
   }
 }
 
+export type CommunityRating = { average: number | null; count: number };
+
+/**
+ * The free-text query. Structured `title=`/`author=` search misses subtitled
+ * Google titles and matches the wrong work for translations; `q=` gets both.
+ */
+export function ratingQuery(title: string, author: string | null | undefined): string {
+  return `${title} ${author ?? ""}`.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Reads the first search doc. No docs, or a doc with no ratings, is a real
+ * answer ("nobody has rated this"), so it returns count 0 rather than null.
+ * Unrated docs omit the fields entirely rather than sending 0.
+ */
+export function parseRatingSearch(json: unknown): CommunityRating {
+  const docs = (json as { docs?: unknown } | null)?.docs;
+  const doc = (Array.isArray(docs) ? docs[0] : undefined) as
+    | { ratings_average?: unknown; ratings_count?: unknown }
+    | undefined;
+
+  const rawCount = doc?.ratings_count;
+  const count =
+    typeof rawCount === "number" && Number.isFinite(rawCount) && rawCount > 0
+      ? Math.floor(rawCount)
+      : 0;
+  const avg = doc?.ratings_average;
+  const average = count > 0 && typeof avg === "number" && Number.isFinite(avg) ? avg : null;
+  return { average, count };
+}
+
+/**
+ * Community rating for a book. Null means "couldn't ask" (network error,
+ * timeout, non-2xx) so the caller retries later; { count: 0 } means
+ * Open Library answered and has nothing.
+ */
+export async function getOpenLibraryRating(book: {
+  title: string;
+  author: string | null;
+}): Promise<CommunityRating | null> {
+  const url =
+    `https://openlibrary.org/search.json?q=${encodeURIComponent(ratingQuery(book.title, book.author))}` +
+    `&fields=key,ratings_average,ratings_count&limit=1`;
+  try {
+    const res = await fetch(url, {
+      // The caller persists the result, and this runs inside after() where the
+      // data cache adds nothing.
+      cache: "no-store",
+      headers: { "User-Agent": "BookTracker/1.0 (personal reading tracker)" },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    return parseRatingSearch(await res.json());
+  } catch {
+    return null;
+  }
+}
+
 /** "/works/OL893414W" -> "OL893414W", for building outbound links. */
 export function olId(olKey: string): string {
   return olKey.replace(/^\/works\//, "");
