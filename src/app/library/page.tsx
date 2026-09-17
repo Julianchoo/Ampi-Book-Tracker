@@ -1,10 +1,24 @@
-import { BookCard } from "@/components/books/book-card";
+import Link from "next/link";
 import { BookSearch } from "@/components/books/book-search";
+import { ShelfGrid } from "@/components/books/shelf-grid";
+import { ShelfHighlights } from "@/components/books/shelf-highlights";
 import { ShelfToolbar } from "@/components/books/shelf-toolbar";
+import { ViewToggle } from "@/components/books/view-toggle";
 import { DachshundReading } from "@/components/dachshund";
-import { isSortKey, STATUSES, type Status } from "@/lib/books";
-import { getShelf } from "@/lib/queries";
+import { Button } from "@/components/ui/button";
+import { getShelfView } from "@/lib/queries";
 import { requireAuth } from "@/lib/session";
+import {
+  clearFiltersHref,
+  filterBooks,
+  groupByYear,
+  hasActiveFilters,
+  libraryHighlights,
+  parseShelfParams,
+  shouldGroup,
+  statusCounts,
+  topSubjects,
+} from "@/lib/shelf";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Library" };
@@ -12,60 +26,84 @@ export const metadata: Metadata = { title: "Library" };
 export default async function LibraryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string; status?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await requireAuth();
-  const params = await searchParams;
+  const filters = parseShelfParams(await searchParams, "library");
+  const { books, collections } = await getShelfView(
+    session.user.id,
+    "library",
+    filters.sort
+  );
 
-  const sort = isSortKey(params.sort) ? params.sort : "recent";
-  const status = STATUSES.includes(params.status as Status)
-    ? (params.status as Status)
-    : undefined;
-
-  const books = await getShelf(session.user.id, "library", { sort, status });
+  const visible = filterBooks(books, filters);
+  // Chip counts respect every filter except status itself, so each chip says
+  // what clicking it would show.
+  const counts = statusCounts(filterBooks(books, filters, { ignoreStatus: true }));
+  const subjects = topSubjects(books);
+  const highlights = hasActiveFilters(filters)
+    ? null
+    : libraryHighlights(books, new Date().getFullYear());
+  const sections = shouldGroup("library", filters) ? groupByYear(visible) : null;
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-6 sm:py-8">
-      <header className="mb-5">
-        <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-          Library
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Everything you&rsquo;ve started, finished, or set aside.
-        </p>
+      <header className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+            Library
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Everything you&rsquo;ve started, finished, or set aside.
+          </p>
+        </div>
+        {books.length > 0 && <ViewToggle view={filters.view} />}
       </header>
 
       <BookSearch className="mb-5" />
 
-      <ShelfToolbar sort={sort} status={status} count={books.length} />
+      {highlights && (
+        <div className="mb-6">
+          <ShelfHighlights highlights={highlights} />
+        </div>
+      )}
+
+      {books.length > 0 && (
+        <ShelfToolbar
+          shelf="library"
+          filters={filters}
+          counts={counts}
+          subjects={subjects}
+          collections={collections}
+          count={visible.length}
+        />
+      )}
 
       {books.length === 0 ? (
-        <EmptyLibrary filtered={!!status} />
+        <div className="flex flex-col items-center py-14 text-center">
+          <DachshundReading className="w-44 text-primary/45" />
+          <p className="mt-4 font-display text-lg font-semibold">
+            Your shelf is empty
+          </p>
+          <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+            Search above for a book you&rsquo;re reading and add it to your library.
+          </p>
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="flex flex-col items-center py-14 text-center">
+          <DachshundReading className="w-44 text-primary/45" />
+          <p className="mt-4 font-display text-lg font-semibold">
+            Nothing matches these filters
+          </p>
+          <Button asChild variant="outline" size="sm" className="mt-4">
+            <Link href={clearFiltersHref("library", filters)}>Clear filters</Link>
+          </Button>
+        </div>
       ) : (
-        <ul className="mt-5 grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
-          {books.map((b) => (
-            <li key={b.id}>
-              <BookCard book={b} />
-            </li>
-          ))}
-        </ul>
+        <div className="mt-5">
+          <ShelfGrid books={visible} sections={sections} view={filters.view} />
+        </div>
       )}
-    </div>
-  );
-}
-
-function EmptyLibrary({ filtered }: { filtered: boolean }) {
-  return (
-    <div className="flex flex-col items-center py-14 text-center">
-      <DachshundReading className="w-44 text-primary/45" />
-      <p className="mt-4 font-display text-lg font-semibold">
-        {filtered ? "Nothing on this shelf" : "Your shelf is empty"}
-      </p>
-      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-        {filtered
-          ? "Try a different status filter."
-          : "Search above for a book you're reading and add it to your library."}
-      </p>
     </div>
   );
 }

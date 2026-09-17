@@ -29,7 +29,7 @@ export function ViewToggle({ view }: { view: View }) {
           // "grid" is the default, so it clears the param.
           onClick={() => setParam("view", v === "grid" ? undefined : v)}
           className={cn(
-            "inline-flex size-8 items-center justify-center rounded-sm transition-colors",
+            "inline-flex size-8 items-center justify-center rounded-sm transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
             view === v
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground hover:bg-accent"

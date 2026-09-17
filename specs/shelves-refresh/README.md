@@ -62,5 +62,5 @@ Transient type errors between waves are expected: task-02 adds a `community` sor
 - [x] [task-07-shelf-toolbar](./tasks/task-07-shelf-toolbar.md) — Status chips, filters, view toggle
 
 ### Wave 3
-- [ ] [task-08-book-page](./tasks/task-08-book-page.md) — Book page: collections picker, rating fact, author link
-- [ ] [task-09-shelf-pages](./tasks/task-09-shelf-pages.md) — Library + wishlist pages
+- [x] [task-08-book-page](./tasks/task-08-book-page.md) — Book page: collections picker, rating fact, author link
+- [x] [task-09-shelf-pages](./tasks/task-09-shelf-pages.md) — Library + wishlist pages

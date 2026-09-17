@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
-import { MIN_COMMUNITY_RATINGS, type Shelf, type SortKey, type Status } from "@/lib/books";
+import { MIN_COMMUNITY_RATINGS, type Shelf, type SortKey } from "@/lib/books";
 import { db } from "@/lib/db";
 import { book, bookCollection, collection } from "@/lib/schema";
 
@@ -113,21 +113,6 @@ export async function getUserCollections(userId: string): Promise<CollectionOpti
     .where(eq(collection.userId, userId))
     .groupBy(collection.id)
     .orderBy(sql`lower(${collection.name})`);
-}
-
-export async function getShelf(
-  userId: string,
-  shelf: Shelf,
-  opts: { sort?: SortKey | undefined; status?: Status | undefined } = {}
-): Promise<Book[]> {
-  const filters = [eq(book.userId, userId), eq(book.shelf, shelf)];
-  if (opts.status) filters.push(eq(book.status, opts.status));
-
-  return db
-    .select()
-    .from(book)
-    .where(and(...filters))
-    .orderBy(...ORDER_BY[opts.sort ?? "recent"]);
 }
 
 /** Deduped: the book page and its generateMetadata both ask for the same row. */

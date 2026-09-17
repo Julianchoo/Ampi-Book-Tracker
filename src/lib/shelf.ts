@@ -73,6 +73,15 @@ export function hasActiveFilters(f: ShelfFilters): boolean {
   return !!(f.status || f.subject || f.author || f.collection);
 }
 
+/** Drops every filter but keeps how the shelf is ordered and displayed. */
+export function clearFiltersHref(shelf: Shelf, filters: ShelfFilters): string {
+  const params = new URLSearchParams();
+  if (filters.sort !== DEFAULT_SORT[shelf]) params.set("sort", filters.sort);
+  if (filters.view === "wall") params.set("view", "wall");
+  const qs = params.toString();
+  return qs ? `/${shelf}?${qs}` : `/${shelf}`;
+}
+
 export function filterBooks<T extends ShelfBook>(
   books: T[],
   f: ShelfFilters,

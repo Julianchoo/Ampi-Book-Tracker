@@ -50,10 +50,14 @@ export function ShelfToolbar({
 
   // A subject from the URL that isn't in the top list still needs an item,
   // otherwise the trigger would render blank.
+  // Filtering is case-insensitive, so match the list case-insensitively too and
+  // use the list's casing as the Select value.
+  const listedSubject = subjects.find(
+    (s) => s.toLowerCase() === filters.subject?.toLowerCase()
+  );
+  const subjectValue = listedSubject ?? filters.subject;
   const subjectOptions =
-    filters.subject && !subjects.includes(filters.subject)
-      ? [filters.subject, ...subjects]
-      : subjects;
+    filters.subject && !listedSubject ? [filters.subject, ...subjects] : subjects;
 
   return (
     <div className="space-y-3">
@@ -71,7 +75,7 @@ export function ShelfToolbar({
                 aria-pressed={filters.status === s}
                 onClick={() => setParam("status", s)}
                 className={cn(
-                  "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors",
+                  "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                   filters.status === s
                     ? "border-primary bg-primary text-primary-foreground"
                     : "bg-background hover:bg-accent"
@@ -93,7 +97,7 @@ export function ShelfToolbar({
             type="button"
             aria-label={`Remove author filter: ${filters.author}`}
             onClick={() => setParam("author", undefined)}
-            className="inline-flex h-8 max-w-full items-center gap-1.5 rounded-full border border-primary/40 px-3 text-sm text-primary transition-colors hover:bg-accent"
+            className="inline-flex h-8 max-w-full items-center gap-1.5 rounded-full border border-primary/40 px-3 text-sm text-primary transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             <span className="truncate">by {filters.author}</span>
             <X className="size-3.5 shrink-0" aria-hidden />
@@ -104,7 +108,7 @@ export function ShelfToolbar({
       <div className="flex flex-wrap gap-2">
         {subjectOptions.length > 0 && (
           <Select
-            value={filters.subject ?? "all"}
+            value={subjectValue ?? "all"}
             onValueChange={(v) => setParam("subject", v)}
           >
             <SelectTrigger size="sm" className={SELECT_CLASS} aria-label="Filter by subject">

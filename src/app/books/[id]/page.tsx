@@ -1,9 +1,11 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import { ArrowLeft, BookOpen, ExternalLink, Heart, Library } from "lucide-react";
 import { BookCoverImage } from "@/components/books/book-cover-image";
 import { BookDetailsForm } from "@/components/books/book-details-form";
+import { CollectionPicker } from "@/components/books/collection-picker";
 import { StarRatingDisplay } from "@/components/books/star-rating";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,8 +19,10 @@ import {
   type Status,
 } from "@/lib/books";
 import { getDescription } from "@/lib/booksearch";
-import { getBook } from "@/lib/queries";
+import { getBook, getBookCollections, getUserCollections } from "@/lib/queries";
+import { refreshRatings } from "@/lib/ratings";
 import { requireAuth } from "@/lib/session";
+import { hasCommunityRating, pickStaleForRating } from "@/lib/shelf";
 import type { Metadata } from "next";
 
 type Params = { params: Promise<{ id: string }> };
@@ -44,14 +48,37 @@ export default async function BookPage({
   const book = await getBook(session.user.id, id);
   if (!book) notFound();
 
+  const [bookCollections, allCollections] = await Promise.all([
+    getBookCollections(session.user.id, book.id),
+    getUserCollections(session.user.id),
+  ]);
+
+  // Open Library is slow; refresh after the response, never during render.
+  // Values are captured up front because after() can't read request APIs.
+  const stale = pickStaleForRating([book]);
+  if (stale.length) {
+    const userId = session.user.id;
+    // ponytail: overlapping re-renders can schedule concurrent refresh jobs that
+    // briefly exceed Open Library's 1 req/s; bounded by the ≤5 cap and
+    // stop-on-failure. Add a per-user in-flight guard if it becomes a problem.
+    after(() =>
+      refreshRatings(userId, stale.map(({ id, title, author }) => ({ id, title, author })))
+    );
+  }
+
   const cover = coverUrls(book.olKey, book.coverId, "L");
   const status = book.status as Status | null;
   const source = sourceUrl(book.olKey);
   const subjects = book.subjects ?? [];
+  const shelf = book.shelf === "wishlist" ? "wishlist" : "library";
 
   const facts = [
     book.firstPublishYear && { label: "First published", value: String(book.firstPublishYear) },
     book.pages && { label: "Pages", value: String(book.pages) },
+    hasCommunityRating(book) && {
+      label: "Community rating",
+      value: `${book.olRating!.toFixed(1)}/5 (${book.olRatingCount!.toLocaleString("en-GB")})`,
+    },
     book.language && { label: "Language", value: languageName(book.language)! },
     formatDate(book.startedAt) && { label: "Started", value: formatDate(book.startedAt)! },
     formatDate(book.finishedAt) && { label: "Finished", value: formatDate(book.finishedAt)! },
@@ -102,7 +129,15 @@ export default async function BookPage({
             {book.title}
           </h1>
           {book.author && (
-            <p className="mt-1 text-base text-muted-foreground">{book.author}</p>
+            <p className="mt-1 text-base text-muted-foreground">
+              <Link
+                href={`/${shelf}?author=${encodeURIComponent(book.author)}`}
+                title="More by this author"
+                className="hover:underline"
+              >
+                {book.author}
+              </Link>
+            </p>
           )}
 
           {book.rating != null && (
@@ -142,6 +177,15 @@ export default async function BookPage({
           </div>
         </div>
       </section>
+
+      <div className="mt-6">
+        <CollectionPicker
+          bookId={book.id}
+          shelf={shelf}
+          assigned={bookCollections}
+          all={allCollections}
+        />
+      </div>
 
       {subjects.length > 0 && (
         <div className="mt-6 flex flex-wrap gap-1.5">

@@ -47,6 +47,9 @@ export function BookCard({
           : undefined
       }
       title={wall ? book.title : undefined}
+      // In the grid the title link below is the named link; the cover is a duplicate.
+      aria-hidden={wall ? undefined : true}
+      tabIndex={wall ? undefined : -1}
       className="focus-visible:ring-ring/50 block rounded-lg focus-visible:ring-[3px] focus-visible:outline-none"
     >
       <div className="card-interactive relative aspect-2/3 w-full overflow-hidden rounded-lg border bg-muted shadow-sm group-hover:shadow-md">
@@ -105,6 +108,7 @@ export function BookCard({
         <Link href={`/books/${book.id}`} className="hover:underline">
           <h3 className="line-clamp-2 text-sm leading-snug font-semibold">
             {book.title}
+            {status && <span className="sr-only">, {STATUS_LABELS[status].toLowerCase()}</span>}
           </h3>
         </Link>
         {book.author && (

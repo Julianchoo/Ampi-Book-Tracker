@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  clearFiltersHref,
   filterBooks,
   groupByYear,
   hasActiveFilters,
@@ -78,6 +79,14 @@ test("status is ignored on the wishlist, and sorts are shelf-specific", () => {
 test("hasActiveFilters ignores sort and view", () => {
   assert.equal(hasActiveFilters(parseShelfParams({ sort: "title", view: "wall" }, "library")), false);
   assert.equal(hasActiveFilters(parseShelfParams({ subject: "x" }, "library")), true);
+});
+
+test("clearFiltersHref drops filters, keeps non-default sort and the wall view", () => {
+  assert.equal(clearFiltersHref("library", parseShelfParams({ subject: "x", sort: "recent" }, "library")), "/library");
+  assert.equal(
+    clearFiltersHref("wishlist", parseShelfParams({ author: "a", sort: "title", view: "wall" }, "wishlist")),
+    "/wishlist?sort=title&view=wall"
+  );
 });
 
 test("filterBooks matches subject and author case-insensitively, and by collection", () => {
