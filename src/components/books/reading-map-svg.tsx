@@ -43,8 +43,141 @@ type Props = {
   onSelect?: ((s: MapSelection | null) => void) | undefined;
   /** Default `0 0 ${map.width} ${map.height}`. Zooming passes a smaller box. */
   viewBox?: string | undefined;
+  /** Drag: how far the map moved under the pointer, in map units. */
+  onPan?: ((dx: number, dy: number) => void) | undefined;
+  /** Wheel or pinch: scale by `factor` about a map point, which stays put. */
+  onZoomAt?: ((factor: number, x: number, y: number) => void) | undefined;
   className?: string | undefined;
 };
+
+/** A pointer has to travel this far before a tap becomes a drag. */
+const DRAG_SLOP = 4;
+/** Wheel delta → zoom factor; a line-mode wheel step counts as this many px. */
+const WHEEL_SENSITIVITY = 0.0015;
+const WHEEL_LINE_PX = 16;
+
+type MapPoint = { x: number; y: number };
+
+/**
+ * Drag to pan, two fingers or the wheel to zoom.
+ *
+ * The map itself never moves here: deltas are handed to the caller in map
+ * units and come back as a new viewBox, so one camera drives the buttons,
+ * the wheel and the fingers alike.
+ */
+function usePanZoom({
+  svgRef,
+  enabled,
+  unit,
+  toMap,
+  onPan,
+  onZoomAt,
+  onDragStart,
+}: {
+  svgRef: React.RefObject<SVGSVGElement | null>;
+  enabled: boolean;
+  /** Map units per CSS pixel right now. */
+  unit: number;
+  toMap: (clientX: number, clientY: number) => MapPoint | null;
+  onPan: ((dx: number, dy: number) => void) | undefined;
+  onZoomAt: ((factor: number, x: number, y: number) => void) | undefined;
+  onDragStart: () => void;
+}) {
+  const [dragging, setDragging] = React.useState(false);
+  const pointers = React.useRef(new Map<number, MapPoint>());
+  const moved = React.useRef(false);
+  // The wheel listener is attached by hand, so it reads the current values
+  // through a ref rather than being torn down on every render.
+  const latest = React.useRef({ enabled, toMap, onZoomAt });
+  React.useEffect(() => {
+    latest.current = { enabled, toMap, onZoomAt };
+  });
+
+  // React's onWheel is passive, and a passive listener cannot stop the page
+  // from scrolling underneath the map.
+  React.useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onWheel = (e: WheelEvent) => {
+      const current = latest.current;
+      if (!current.enabled || !current.onZoomAt) return;
+      e.preventDefault();
+      const point = current.toMap(e.clientX, e.clientY);
+      if (!point) return;
+      const delta = e.deltaMode === 1 ? e.deltaY * WHEEL_LINE_PX : e.deltaY;
+      current.onZoomAt(Math.exp(-delta * WHEEL_SENSITIVITY), point.x, point.y);
+    };
+    svg.addEventListener("wheel", onWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", onWheel);
+  }, [svgRef]);
+
+  /** Midpoint of every pointer on the map, and how far apart they are. */
+  const gesture = () => {
+    const points = [...pointers.current.values()];
+    const mid = points.reduce(
+      (acc, p) => ({ x: acc.x + p.x / points.length, y: acc.y + p.y / points.length }),
+      { x: 0, y: 0 }
+    );
+    const [a, b] = points;
+    const spread = a && b ? Math.hypot(b.x - a.x, b.y - a.y) : 0;
+    return { mid, spread, count: points.length };
+  };
+
+  const end = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!pointers.current.delete(e.pointerId)) return;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    if (pointers.current.size === 0) setDragging(false);
+  };
+
+  const handlers: React.DOMAttributes<SVGSVGElement> = enabled
+    ? {
+        onPointerDown: (e) => {
+          if (e.pointerType === "mouse" && e.button !== 0) return;
+          pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          moved.current = false;
+        },
+        onPointerMove: (e) => {
+          if (!pointers.current.has(e.pointerId)) return;
+          const before = gesture();
+          pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          const after = gesture();
+          const dx = after.mid.x - before.mid.x;
+          const dy = after.mid.y - before.mid.y;
+
+          // A tap that never travels stays a tap, so nodes remain clickable.
+          if (!moved.current && after.count < 2 && Math.hypot(dx, dy) < DRAG_SLOP) {
+            return;
+          }
+          if (!moved.current) {
+            moved.current = true;
+            setDragging(true);
+            onDragStart();
+            // Captured only once it is a drag, so a tap keeps its target.
+            if (after.count === 1) e.currentTarget.setPointerCapture(e.pointerId);
+          }
+
+          if (dx || dy) onPan?.(dx * unit, dy * unit);
+          if (after.count >= 2 && before.spread > 0 && after.spread > 0) {
+            const point = toMap(after.mid.x, after.mid.y);
+            if (point) onZoomAt?.(after.spread / before.spread, point.x, point.y);
+          }
+        },
+        onPointerUp: end,
+        onPointerCancel: end,
+        onLostPointerCapture: end,
+        // A drag must not fall through as a click on whatever was underneath.
+        onClickCapture: (e) => {
+          if (!moved.current) return;
+          e.preventDefault();
+          e.stopPropagation();
+        },
+      }
+    : {};
+
+  return { dragging, handlers };
+}
 
 /** The home preview is server-rendered, where useLayoutEffect warns. */
 const useIsomorphicLayoutEffect =
@@ -289,6 +422,8 @@ export function ReadingMapSvg({
   selected,
   onSelect,
   viewBox,
+  onPan,
+  onZoomAt,
   className,
 }: Props) {
   const uid = React.useId().replace(/:/g, "");
@@ -328,6 +463,27 @@ export function ReadingMapSvg({
   }, [viewBox, map.width]);
 
   const unit = 1 / (fitScale * zoom.k);
+
+  /** Screen point → map point, undoing the svg's own scale and the zoom. */
+  const toMap = React.useCallback(
+    (clientX: number, clientY: number): MapPoint | null => {
+      const ctm = svgRef.current?.getScreenCTM();
+      if (!ctm) return null;
+      const p = new DOMPoint(clientX, clientY).matrixTransform(ctm.inverse());
+      return { x: (p.x - zoom.tx) / zoom.k, y: (p.y - zoom.ty) / zoom.k };
+    },
+    [zoom]
+  );
+
+  const { dragging, handlers } = usePanZoom({
+    svgRef,
+    enabled: full && Boolean(onPan),
+    unit,
+    toMap,
+    onPan,
+    onZoomAt,
+    onDragStart: () => setHovered(null),
+  });
   // Labels shrink a little on small screens (where the map is drawn small)
   // and grow back as you zoom in.
   const labelScale = Math.min(1, Math.max(0.8, (fitScale * zoom.k) / 0.7));
@@ -348,7 +504,7 @@ export function ReadingMapSvg({
     [frame]
   );
 
-  const active = full ? (hovered ?? selected) : null;
+  const active = full ? ((!dragging && hovered) || selected) : null;
   const lit = React.useMemo(
     () => highlightFor(active, map.genres, bookById),
     [active, map.genres, bookById]
@@ -398,7 +554,13 @@ export function ReadingMapSvg({
       viewBox={`${frame.x} ${frame.y} ${frame.w} ${frame.h}`}
       preserveAspectRatio="xMidYMid meet"
       aria-hidden
-      className={cn("block size-full select-none", className)}
+      className={cn(
+        "block size-full select-none",
+        full && onPan && "touch-none cursor-grab",
+        dragging && "cursor-grabbing [&_*]:cursor-grabbing",
+        className
+      )}
+      {...handlers}
       onClick={full ? () => onSelect?.(null) : undefined}
     >
       <defs>
@@ -450,7 +612,7 @@ export function ReadingMapSvg({
           transform: `translate(${zoom.tx}px, ${zoom.ty}px) scale(${zoom.k})`,
           transformOrigin: "0 0",
         }}
-        className="transition-transform duration-500 ease-out motion-reduce:transition-none"
+        className={dragging ? undefined : "transition-transform duration-500 ease-out motion-reduce:transition-none"}
       >
         {/* Links first so every node sits on top of them. */}
         <g fill="none" className="stroke-primary">

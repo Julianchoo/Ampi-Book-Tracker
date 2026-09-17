@@ -36,7 +36,14 @@ import type {
 } from "@/lib/constellation";
 import { cn } from "@/lib/utils";
 
-const ZOOM_STEPS = [1, 1.5, 2.25, 3.4] as const;
+/* Zoom is continuous (wheel and pinch land anywhere between), so the buttons
+ * step by a factor rather than walking a list of levels. */
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 4;
+const ZOOM_FACTOR = 1.5;
+
+/** Where the map is looking: scale plus the map point at the centre. */
+type Camera = { k: number; cx: number; cy: number };
 
 function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -71,19 +78,29 @@ function selectionStatus(selected: MapSelection | null, index: Index): string {
   return book.author ? `${book.title} by ${book.author}` : book.title;
 }
 
-/** The viewBox for a zoom level, centred on a point and kept inside the map. */
-function zoomViewBox(
-  map: ReadingMapData,
-  k: number,
-  cx: number,
-  cy: number
-): string {
+/** Keeps the camera zoomed within range and looking at the map, never past it. */
+function clampCamera(map: ReadingMapData, cam: Camera): Camera {
+  const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, cam.k));
   const w = map.width / k;
   const h = map.height / k;
-  const x = Math.min(Math.max(cx - w / 2, 0), map.width - w);
-  const y = Math.min(Math.max(cy - h / 2, 0), map.height - h);
-  return `${x} ${y} ${w} ${h}`;
+  return {
+    k,
+    cx: Math.min(Math.max(cam.cx, w / 2), map.width - w / 2),
+    cy: Math.min(Math.max(cam.cy, h / 2), map.height - h / 2),
+  };
 }
+
+function cameraViewBox(map: ReadingMapData, cam: Camera): string {
+  const w = map.width / cam.k;
+  const h = map.height / cam.k;
+  return `${cam.cx - w / 2} ${cam.cy - h / 2} ${w} ${h}`;
+}
+
+const centreOf = (map: ReadingMapData): Camera => ({
+  k: 1,
+  cx: map.width / 2,
+  cy: map.height / 2,
+});
 
 export function ReadingMap({ map }: { map: ReadingMapData }) {
   const summary = `${plural(map.books.length, "book")} across ${plural(map.genres.length, "genre")}`;
@@ -143,20 +160,36 @@ function MapDialogBody({
   const index = useIndex(map);
   const [view, setView] = React.useState<"map" | "list">("map");
   const [selected, setSelected] = React.useState<MapSelection | null>(null);
-  const [zoomStep, setZoomStep] = React.useState(0);
+  const [cam, setCam] = React.useState<Camera>(() => centreOf(map));
 
-  const focus = selected
-    ? selected.kind === "book"
-      ? index.bookById.get(selected.id)
-      : index.genreById.get(selected.id)
-    : undefined;
-  const k = ZOOM_STEPS[zoomStep] ?? 1;
-  const viewBox = zoomViewBox(
-    map,
-    k,
-    focus?.x ?? map.width / 2,
-    focus?.y ?? map.height / 2
-  );
+  /** Selecting from the panel or the list brings that node into view. */
+  const select = (selection: MapSelection | null) => {
+    setSelected(selection);
+    const node = selection
+      ? selection.kind === "book"
+        ? index.bookById.get(selection.id)
+        : index.genreById.get(selection.id)
+      : undefined;
+    if (node) setCam((c) => clampCamera(map, { ...c, cx: node.x, cy: node.y }));
+  };
+
+  /** Drag: the map follows the pointer, so the camera moves the other way. */
+  const pan = (dx: number, dy: number) =>
+    setCam((c) => clampCamera(map, { ...c, cx: c.cx - dx, cy: c.cy - dy }));
+
+  /** Wheel, pinch and the buttons: zoom about a point, which stays put. */
+  const zoomAt = (factor: number, x: number, y: number) =>
+    setCam((c) => {
+      const next = clampCamera(map, { ...c, k: c.k * factor });
+      const applied = next.k / c.k; // clamping may have cut the factor short
+      return clampCamera(map, {
+        k: next.k,
+        cx: x + (c.cx - x) / applied,
+        cy: y + (c.cy - y) / applied,
+      });
+    });
+
+  const viewBox = cameraViewBox(map, cam);
 
   return (
     <>
@@ -183,12 +216,15 @@ function MapDialogBody({
               map={map}
               mode="full"
               selected={selected}
-              onSelect={setSelected}
+              onSelect={select}
               viewBox={viewBox}
+              onPan={pan}
+              onZoomAt={zoomAt}
             />
             <ZoomControls
-              step={zoomStep}
-              onChange={setZoomStep}
+              zoom={cam.k}
+              onZoom={(factor) => zoomAt(factor, cam.cx, cam.cy)}
+              onReset={() => setCam(centreOf(map))}
               className="absolute top-3 right-3"
             />
             <Legend className="absolute bottom-3 left-3" />
@@ -203,7 +239,7 @@ function MapDialogBody({
               map={map}
               index={index}
               selected={selected}
-              onSelect={setSelected}
+              onSelect={select}
             />
           </aside>
         </div>
@@ -257,19 +293,20 @@ function ViewToggle({
 }
 
 function ZoomControls({
-  step,
-  onChange,
+  zoom,
+  onZoom,
+  onReset,
   className,
 }: {
-  step: number;
-  onChange: (step: number) => void;
+  zoom: number;
+  onZoom: (factor: number) => void;
+  onReset: () => void;
   className?: string;
 }) {
-  const last = ZOOM_STEPS.length - 1;
   const buttons = [
-    { label: "Zoom in", Icon: ZoomIn, to: Math.min(step + 1, last), disabled: step >= last },
-    { label: "Zoom out", Icon: ZoomOut, to: Math.max(step - 1, 0), disabled: step <= 0 },
-    { label: "Reset zoom", Icon: RotateCcw, to: 0, disabled: step === 0 },
+    { label: "Zoom in", Icon: ZoomIn, act: () => onZoom(ZOOM_FACTOR), disabled: zoom >= MAX_ZOOM },
+    { label: "Zoom out", Icon: ZoomOut, act: () => onZoom(1 / ZOOM_FACTOR), disabled: zoom <= MIN_ZOOM },
+    { label: "Reset zoom", Icon: RotateCcw, act: onReset, disabled: zoom <= MIN_ZOOM },
   ];
   return (
     <div
@@ -278,7 +315,7 @@ function ZoomControls({
         className
       )}
     >
-      {buttons.map(({ label, Icon, to, disabled }) => (
+      {buttons.map(({ label, Icon, act, disabled }) => (
         <Button
           key={label}
           type="button"
@@ -286,7 +323,7 @@ function ZoomControls({
           size="icon-sm"
           aria-label={label}
           disabled={disabled}
-          onClick={() => onChange(to)}
+          onClick={act}
           className="rounded-none"
         >
           <Icon />

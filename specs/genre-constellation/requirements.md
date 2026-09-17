@@ -15,7 +15,6 @@ The user explicitly asked for a very beautiful interface. The home preview draws
 
 ## Non-Goals
 
-- Drag-to-pan, pinch or wheel zoom (buttons only).
 - Multi-hue categorical colouring (the chart palette fails colour-vision validation; single hue + direct labels instead).
 - Author or collection nodes.
 - A separate /map page.
@@ -25,7 +24,7 @@ The user explicitly asked for a very beautiful interface. The home preview draws
 - [ ] Home shows the reading map card below the stats charts when ≥ 3 books have usable subjects; hidden otherwise.
 - [ ] With the user's real data the graph has ~20 genre nodes (fiction the biggest hub, ~28 books), not one giant star.
 - [ ] Preview is static (no scroll hijack), labels only the top 6 genres, and the whole card opens the dialog.
-- [ ] Dialog: full map with all genre labels (legible halo), books drawn as small covers (dots until/unless a thumbnail loads; library dots filled / wishlist dots hollow-dashed, wishlist covers faded with a dashed frame), select a book → highlight + detail panel with cover, title, author, rating and "Open book"; select a genre → highlight its books; zoom in/out/reset; Map/List toggle.
+- [ ] Dialog: full map with all genre labels (legible halo), books drawn as small covers (dots until/unless a thumbnail loads; library dots filled / wishlist dots hollow-dashed, wishlist covers faded with a dashed frame), select a book → highlight + detail panel with cover, title, author, rating and "Open book"; select a genre → highlight its books; zoom in/out/reset buttons, drag to pan, pinch (touch) and wheel (pointer) zoom, all clamped to the map; Map/List toggle.
 - [ ] Works at 375px width and desktop, light and dark.
 - [ ] `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm build:ci` pass.
 
