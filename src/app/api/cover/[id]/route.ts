@@ -33,12 +33,15 @@ async function load(id: string, zoom: number) {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  // Thumbnails (search hits, reading-map nodes) never need more than the low
+  // zoom, and it is always real, so there is nothing to decide or remember.
+  const small = new URL(request.url).searchParams.get("size") === "small";
 
-  const known = verdicts.get(id);
+  const known = small ? LOW : verdicts.get(id);
   let image = await load(id, known ?? HIGH);
 
   // Only the high zoom can be a stand-in; the low one is what Google always has.

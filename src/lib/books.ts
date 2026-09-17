@@ -123,7 +123,9 @@ export function coverUrls(
     // One candidate, because the hard part is settled server-side: Google
     // hands out stand-in graphics with a 200 and only the byte count gives
     // them away, so /api/cover picks the sharpest zoom that is really there.
-    return [`/api/cover/${encodeURIComponent(olKey.slice("google:".length))}`];
+    const url = `/api/cover/${encodeURIComponent(olKey.slice("google:".length))}`;
+    // S skips the high-zoom probe: 128px is plenty and never a stand-in.
+    return [size === "S" ? `${url}?size=small` : url];
   }
   return coverId
     ? [`https://covers.openlibrary.org/b/id/${coverId}-${OL_SIZE[size]}.jpg`]

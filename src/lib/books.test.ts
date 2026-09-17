@@ -21,6 +21,15 @@ test("google covers go through the resolver, which settles the zoom server-side"
   assert.deepEqual(urls, ["/api/cover/uf5NEAAAQBAJ"]);
 });
 
+test("google thumbnails ask the resolver for the small zoom only", () => {
+  assert.deepEqual(coverUrls("google:uf5NEAAAQBAJ", null, "S"), [
+    "/api/cover/uf5NEAAAQBAJ?size=small",
+  ]);
+  assert.deepEqual(coverUrls("google:uf5NEAAAQBAJ", null, "M"), [
+    "/api/cover/uf5NEAAAQBAJ",
+  ]);
+});
+
 test("a volume id that needs escaping stays a single safe path segment", () => {
   const [url] = coverUrls("google:a/b?c", null);
   assert.equal(url, "/api/cover/a%2Fb%3Fc");

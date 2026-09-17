@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Image optimization configuration
   images: {
+    // Setting localPatterns replaces the default (any local path, no query),
+    // so that default is restated alongside the cover proxy's small size.
+    localPatterns: [
+      { pathname: "/**", search: "" },
+      { pathname: "/api/cover/**", search: "?size=small" },
+    ],
     remotePatterns: [
       {
         protocol: "https",

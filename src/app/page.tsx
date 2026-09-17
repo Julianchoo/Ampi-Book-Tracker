@@ -4,12 +4,14 @@ import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
 import { SignInButton } from "@/components/auth/sign-in-button";
 import { BookCoverImage } from "@/components/books/book-cover-image";
 import { BookSearch } from "@/components/books/book-search";
+import { ReadingMap } from "@/components/books/reading-map";
 import { ReadingStatsCharts } from "@/components/books/reading-stats";
 import { StarRatingDisplay } from "@/components/books/star-rating";
 import { DachshundLogo, DachshundReading, PawPrint } from "@/components/dachshund";
 import { Button } from "@/components/ui/button";
 import { isGoogleEnabled } from "@/lib/auth";
 import { coverUrls, formatDate } from "@/lib/books";
+import { getReadingMap } from "@/lib/constellation-layout";
 import { getCurrentlyReading, getStats, type Book } from "@/lib/queries";
 import { getOptionalSession } from "@/lib/session";
 
@@ -17,9 +19,10 @@ export default async function HomePage() {
   const session = await getOptionalSession();
   if (!session) return <Landing />;
 
-  const [current, stats] = await Promise.all([
+  const [current, stats, readingMap] = await Promise.all([
     getCurrentlyReading(session.user.id),
     getStats(session.user.id),
+    getReadingMap(session.user.id),
   ]);
 
   const firstName = session.user.name?.split(" ")[0];
@@ -55,6 +58,12 @@ export default async function HomePage() {
       </div>
 
       <ReadingStatsCharts stats={stats} />
+
+      {readingMap && (
+        <div className="mt-8">
+          <ReadingMap map={readingMap} />
+        </div>
+      )}
     </div>
   );
 }

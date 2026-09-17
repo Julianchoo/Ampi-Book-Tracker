@@ -117,7 +117,8 @@ const SUBJECT_STOPLIST = new Set([
   "large type books",
 ]);
 
-function isNoiseSubject(key: string): boolean {
+/** `key` is a trimmed, lowercased subject. */
+export function isNoiseSubject(key: string): boolean {
   return SUBJECT_STOPLIST.has(key) || key.startsWith("overdrive") || key.includes("nyt:");
 }
 

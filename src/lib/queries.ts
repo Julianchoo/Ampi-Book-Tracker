@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
 import { MIN_COMMUNITY_RATINGS, type Shelf, type SortKey } from "@/lib/books";
+import type { MapBookInput } from "@/lib/constellation";
 import { db } from "@/lib/db";
 import { book, bookCollection, collection } from "@/lib/schema";
 
@@ -126,6 +127,26 @@ export const getBook = cache(async function getBook(
     .where(and(eq(book.id, id), eq(book.userId, userId)));
   return row ?? null;
 });
+
+/** Both shelves, only the fields the reading map shows (no notes/description reach the client). */
+export async function getConstellationBooks(userId: string): Promise<MapBookInput[]> {
+  return db
+    .select({
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      olKey: book.olKey,
+      coverId: book.coverId,
+      subjects: book.subjects,
+      shelf: book.shelf,
+      status: book.status,
+      rating: book.rating,
+      olRating: book.olRating,
+      olRatingCount: book.olRatingCount,
+    })
+    .from(book)
+    .where(eq(book.userId, userId));
+}
 
 /** The book for the home hero: most recently started, still being read. */
 export async function getCurrentlyReading(userId: string): Promise<Book | null> {
