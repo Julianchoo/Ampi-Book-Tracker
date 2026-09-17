@@ -3,6 +3,7 @@ import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
 import { MIN_COMMUNITY_RATINGS, type Shelf, type SortKey } from "@/lib/books";
 import type { MapBookInput } from "@/lib/constellation";
 import { db } from "@/lib/db";
+import type { InsightsBook } from "@/lib/insights";
 import { book, bookCollection, collection } from "@/lib/schema";
 
 export type Book = typeof book.$inferSelect;
@@ -143,6 +144,28 @@ export async function getConstellationBooks(userId: string): Promise<MapBookInpu
       rating: book.rating,
       olRating: book.olRating,
       olRatingCount: book.olRatingCount,
+    })
+    .from(book)
+    .where(eq(book.userId, userId));
+}
+
+/** Both shelves, only the fields the insights page needs. */
+export async function getInsightsBooks(userId: string): Promise<InsightsBook[]> {
+  return db
+    .select({
+      id: book.id,
+      title: book.title,
+      author: book.author,
+      olKey: book.olKey,
+      coverId: book.coverId,
+      subjects: book.subjects,
+      shelf: book.shelf,
+      status: book.status,
+      rating: book.rating,
+      olRating: book.olRating,
+      olRatingCount: book.olRatingCount,
+      finishedAt: book.finishedAt,
+      firstPublishYear: book.firstPublishYear,
     })
     .from(book)
     .where(eq(book.userId, userId));

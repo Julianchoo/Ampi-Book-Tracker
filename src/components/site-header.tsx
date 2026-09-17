@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Heart, Home, Library, Menu } from "lucide-react";
+import { ChartNoAxesColumn, Heart, Home, Library, Menu } from "lucide-react";
 import { UserProfile } from "@/components/auth/user-profile";
 import { DachshundLogo } from "@/components/dachshund";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { ModeToggle } from "./ui/mode-toggle";
 const NAV = [
   { href: "/library", label: "Library", icon: Library },
   { href: "/wishlist", label: "Wishlist", icon: Heart },
+  { href: "/insights", label: "Insights", icon: ChartNoAxesColumn },
 ];
 
 export async function SiteHeader() {

@@ -76,8 +76,9 @@ function StatTile({
 }
 
 /* Two buttons rather than tabs: there is no second panel, only one set of
- * numbers that changes underneath. aria-pressed says exactly that. */
-function RangeToggle({
+ * numbers that changes underneath. aria-pressed says exactly that.
+ * Exported because the insights page needs the identical control. */
+export function RangeToggle({
   year,
   value,
   onChange,
