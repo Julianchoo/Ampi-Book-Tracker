@@ -129,6 +129,18 @@ export const getBook = cache(async function getBook(
   return row ?? null;
 });
 
+/** Whether this user already has a search hit shelved, and where. For the preview page's CTA. */
+export async function getBookByOlKey(
+  userId: string,
+  olKey: string
+): Promise<{ id: string; shelf: Shelf } | null> {
+  const [row] = await db
+    .select({ id: book.id, shelf: book.shelf })
+    .from(book)
+    .where(and(eq(book.userId, userId), eq(book.olKey, olKey)));
+  return row ? { id: row.id, shelf: row.shelf as Shelf } : null;
+}
+
 /** Both shelves, only the fields the reading map shows (no notes/description reach the client). */
 export async function getConstellationBooks(userId: string): Promise<MapBookInput[]> {
   return db

@@ -27,6 +27,12 @@ export type BookSearchResult = {
 export const SHELVES = ["library", "wishlist"] as const;
 export type Shelf = (typeof SHELVES)[number];
 
+/** A search hit annotated with whether the signed-in user already shelved it. */
+export type SearchHit = BookSearchResult & {
+  onShelf: Shelf | null;
+  bookId: string | null;
+};
+
 /** Reading status. Only meaningful for books on the library shelf. */
 export const STATUSES = ["reading", "finished", "abandoned"] as const;
 export type Status = (typeof STATUSES)[number];
@@ -181,6 +187,53 @@ export function sourceUrl(
     href: `https://openlibrary.org${olKey.startsWith("/") ? olKey : `/works/${olKey}`}`,
     label: "Open Library",
   };
+}
+
+/**
+ * Route to a search hit's own preview page — the book's details without
+ * adding it to a shelf. The hit's fields ride along as query params rather
+ * than being re-fetched by key: the search already has them, a second
+ * provider round-trip could disagree, and neither provider exposes a clean
+ * "fetch one work by key with every field" call the way search does.
+ *
+ * olKey becomes the path so the page is a real, shareable/back-button-able
+ * URL rather than a client-only modal. Open Library keys carry a leading
+ * slash ("/works/OL27448W"); stripped and split on "/" it round-trips
+ * through a catch-all segment with no encoding tricks. Google keys
+ * ("google:xyz") have no slash and pass through as one segment.
+ */
+export function previewHref(hit: {
+  olKey: string;
+  source: Source;
+  title: string;
+  author: string | null;
+  coverId: number | null;
+  firstPublishYear: number | null;
+  pages: number | null;
+  language: string | null;
+  subjects: string[];
+}): string {
+  const clean = hit.olKey.startsWith("/") ? hit.olKey.slice(1) : hit.olKey;
+  const path = clean
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+
+  const params = new URLSearchParams({ source: hit.source, title: hit.title });
+  if (hit.author) params.set("author", hit.author);
+  if (hit.coverId != null) params.set("cover", String(hit.coverId));
+  if (hit.firstPublishYear != null) params.set("year", String(hit.firstPublishYear));
+  if (hit.pages != null) params.set("pages", String(hit.pages));
+  if (hit.language) params.set("lang", hit.language);
+  if (hit.subjects.length > 0) params.set("subjects", hit.subjects.join("|"));
+
+  return `/books/preview/${path}?${params.toString()}`;
+}
+
+/** Inverse of the path half of previewHref(): catch-all segments back to an olKey. */
+export function slugToOlKey(slug: string[]): string {
+  const joined = slug.map((segment) => decodeURIComponent(segment)).join("/");
+  return joined.startsWith("google:") ? joined : `/${joined}`;
 }
 
 /**

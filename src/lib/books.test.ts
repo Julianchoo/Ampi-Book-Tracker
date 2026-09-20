@@ -1,7 +1,27 @@
 // Run: node --experimental-strip-types --test src/lib/books.test.ts
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { coverUrls, looksLikeCover, stepPastCandidate } from "./books.ts";
+import {
+  coverUrls,
+  looksLikeCover,
+  previewHref,
+  slugToOlKey,
+  stepPastCandidate,
+  type BookSearchResult,
+} from "./books.ts";
+
+const baseHit: BookSearchResult = {
+  olKey: "/works/OL27448W",
+  source: "openlibrary",
+  title: "Dune",
+  author: "Frank Herbert",
+  coverId: 258027,
+  firstPublishYear: 1965,
+  pages: 412,
+  language: "eng",
+  subjects: ["Science fiction", "Adventure"],
+  description: null,
+};
 
 // Every size below was measured against the live endpoints, not guessed.
 test("rejects the placeholders both providers serve with a 200", () => {
@@ -65,4 +85,44 @@ test("each distinct candidate failing still walks the list to the end", () => {
   const j = stepPastCandidate(candidates, i, "low.jpg");
   assert.equal(j, 2);
   assert.equal(candidates[j], undefined, "runs out, so the caller shows fallback");
+});
+
+test("an Open Library preview href round-trips back to the original olKey", () => {
+  const href = previewHref(baseHit);
+  assert.equal(href, "/books/preview/works/OL27448W?source=openlibrary&title=Dune&author=Frank+Herbert&cover=258027&year=1965&pages=412&lang=eng&subjects=Science+fiction%7CAdventure");
+
+  const [path, query] = href.split("?");
+  const slug = path!.slice("/books/preview/".length).split("/");
+  assert.equal(slugToOlKey(slug), baseHit.olKey);
+
+  const params = new URLSearchParams(query);
+  assert.equal(params.get("title"), baseHit.title);
+  assert.equal(params.get("subjects"), baseHit.subjects.join("|"));
+});
+
+test("a Google preview href round-trips, including a volume id with a slash", () => {
+  const hit: BookSearchResult = { ...baseHit, olKey: "google:a/b?c", source: "google" };
+  const href = previewHref(hit);
+
+  const [path] = href.split("?");
+  const slug = path!.slice("/books/preview/".length).split("/").map(decodeURIComponent);
+  assert.equal(slugToOlKey(slug), hit.olKey);
+});
+
+test("preview href omits query params for fields the hit doesn't have", () => {
+  const hit: BookSearchResult = {
+    ...baseHit,
+    author: null,
+    coverId: null,
+    firstPublishYear: null,
+    pages: null,
+    language: null,
+    subjects: [],
+  };
+  const href = previewHref(hit);
+  const [, query] = href.split("?");
+  const params = new URLSearchParams(query);
+  for (const key of ["author", "cover", "year", "pages", "lang", "subjects"]) {
+    assert.equal(params.has(key), false, `${key} should be omitted`);
+  }
 });
