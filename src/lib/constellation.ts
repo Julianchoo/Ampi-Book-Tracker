@@ -91,6 +91,24 @@ const SYNONYMS: Record<string, string[]> = {
   essays: ["Literary Collections", "Essays"],
 };
 
+/**
+ * BISAC segments that stop being about genre and start slicing a shelf some
+ * other way — by setting, by subject, by who the book is about. Everything
+ * from here on is discarded rather than skipped over: "Fiction / Places /
+ * Europe" is Fiction, not a genre called Europe, and "Biography &
+ * Autobiography / Women" is a biography.
+ */
+const PIVOT_SEGMENTS = new Set([
+  "places",
+  "topics",
+  "themes",
+  "subjects & themes",
+  "anthologies",
+]);
+
+/** BISAC roots Google files young-readers titles under; they belong in the Fiction tree. */
+const FICTION_ALIASES = new Set(["young adult fiction", "juvenile fiction"]);
+
 /** A normalised genre path: at most 2 segments, original casing kept for labels. */
 type Path = { id: string; segments: string[]; fixedLabels: boolean };
 
@@ -114,7 +132,15 @@ function normaliseSubject(raw: string): Path | null {
     segments = subject
       .split("/")
       .map((s) => s.trim())
+      // "General" is filler in any position ("Fiction / Thrillers / General"),
+      // so it is skipped; a pivot segment ends the genre part of the path.
       .filter((s) => s && s.toLowerCase() !== "general");
+    const pivot = segments.findIndex((s) => PIVOT_SEGMENTS.has(s.toLowerCase()));
+    if (pivot !== -1) segments = segments.slice(0, pivot);
+    // Before the Suspense fold below, which is gated on a "fiction" top segment.
+    if (FICTION_ALIASES.has(segments[0]?.toLowerCase() ?? "")) {
+      segments = ["Fiction", ...segments.slice(1)];
+    }
     // "Fiction / Thrillers / Suspense" and "Fiction / Suspense" are one genre.
     const second = segments[1]?.toLowerCase();
     if (segments[0]?.toLowerCase() === "fiction" && (second === "thrillers" || second === "suspense")) {
@@ -177,10 +203,18 @@ export function buildGenreGraph(books: MapBookInput[]): Omit<ReadingMap, "width"
       const parent = parentOf(id);
       return parent && qualifies(parent) ? [parent] : [];
     });
-    const chosen = dropPrefixes(kept)
+    // A provider lists a book's categories most-relevant first: Google leads A
+    // Game of Thrones with "Fiction / Fantasy / Epic". Ranking by how popular a
+    // genre is across the whole shelf instead would file it under Science
+    // Fiction, which is a bigger node here but the wrong answer for the book.
+    const position = new Map(dropPrefixes(kept).map((id, i) => [id, i]));
+    const chosen = [...position.keys()]
       .sort(
         (a, b) =>
-          depthOf(b) - depthOf(a) || initialCount(b) - initialCount(a) || cmp(a, b)
+          depthOf(b) - depthOf(a) ||
+          position.get(a)! - position.get(b)! ||
+          initialCount(b) - initialCount(a) ||
+          cmp(a, b)
       )
       .slice(0, MAX_LINKS_PER_BOOK);
     genreIdsByBook.set(bookId, chosen.length > 0 ? chosen : [OTHER_ID]);

@@ -80,6 +80,77 @@ export async function searchGoogleBooks(
     .filter((b): b is BookSearchResult => b !== null);
 }
 
+/**
+ * Google's per-volume endpoint returns the union of every BISAC path its
+ * editions carry — up to ~19 for a popular book, with unrelated families at
+ * the tail. *The Silent Patient* comes back with nine "Fiction / …" paths
+ * followed by "Religion / Ancient", "Psychology / Assessment, Testing &
+ * Measurement", "Art / History / Ancient & Classical" and "Medical / Ethics".
+ *
+ * The leading segment is the family, so keeping only the most common one drops
+ * the tail without a hand-written blocklist. Ties go to whichever family was
+ * seen first, which is the order Google itself considers most relevant.
+ */
+export function pickBisacCategories(categories: string[], max = 6): string[] {
+  const entries: { text: string; family: string }[] = [];
+  const counts = new Map<string, number>();
+
+  for (const raw of categories) {
+    const text = raw.trim();
+    if (!text) continue;
+    const family = (text.split("/")[0] ?? "").trim().toLowerCase();
+    entries.push({ text, family });
+    counts.set(family, (counts.get(family) ?? 0) + 1);
+  }
+
+  let winner: string | null = null;
+  for (const { family } of entries) {
+    if (winner === null || counts.get(family)! > counts.get(winner)!) {
+      winner = family;
+    }
+  }
+
+  return entries
+    .filter((e) => e.family === winner)
+    .slice(0, max)
+    .map((e) => e.text);
+}
+
+/** lowercase, unaccented, subtitle dropped, punctuation and spacing flattened */
+function normaliseTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .split(":")[0]!
+    // Apostrophes close up ("handmaid's" -> "handmaids") so a candidate that
+    // drops them still matches; every other mark becomes a space, so an em
+    // dash and a hyphen agree rather than fusing the words either side.
+    .replace(/['‘’]/g, "")
+    .replace(/\p{P}|\p{S}/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Whether a Google volume title is the same book as the one we stored.
+ *
+ * Searching by title alone happily returns a translation ("Crónicas de Dune"),
+ * a foreign edition ("Sapiens. De animales a dioses") or a study guide
+ * ("Summary of The Silent Patient"), and resolving a stored book to one of
+ * those writes the wrong metadata onto it. Exact equality after normalising is
+ * deliberately strict: a miss costs nothing, a false match corrupts a row.
+ *
+ * Everything from the first ":" is dropped because `toResult` above merges the
+ * subtitle in as `${title}: ${subtitle}`, so "Dune" and "Dune: The Graphic
+ * Novel" are the same volume seen with and without one.
+ */
+export function matchesStoredTitle(stored: string, candidate: string): boolean {
+  const a = normaliseTitle(stored);
+  const b = normaliseTitle(candidate);
+  return a.length > 0 && a === b;
+}
+
 /** Long-form description for one volume, for rows saved before it was stored. */
 export async function getGoogleDescription(
   volumeId: string
@@ -94,6 +165,37 @@ export async function getGoogleDescription(
     if (!res.ok) return null;
     const data = (await res.json()) as Volume;
     return data.volumeInfo?.description?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * BISAC categories for one volume, trimmed to the dominant family.
+ *
+ * Null means "couldn't ask" (no API key, non-2xx, timeout, thrown) so the
+ * caller retries later; `[]` means Google answered and this volume genuinely
+ * has no categories. Collapsing the two would persist an empty list on a
+ * transient failure and leave the book permanently uncategorised.
+ */
+export async function getGoogleCategories(
+  volumeId: string
+): Promise<string[] | null> {
+  const key = process.env.BOOKS_API_KEY;
+  if (!key) return null;
+  try {
+    const res = await fetch(
+      `${ENDPOINT}/${encodeURIComponent(volumeId)}?key=${encodeURIComponent(key)}`,
+      {
+        // The caller persists the result, and this runs inside after() where
+        // the data cache buys nothing and would add an ISR entry per book.
+        cache: "no-store",
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as Volume;
+    return pickBisacCategories(data.volumeInfo?.categories ?? []);
   } catch {
     return null;
   }

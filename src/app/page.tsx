@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { isGoogleEnabled } from "@/lib/auth";
 import { coverUrls, formatDate } from "@/lib/books";
 import { getReadingMap } from "@/lib/constellation-layout";
+import { queueGenreBackfill } from "@/lib/genres";
 import { getCurrentlyReading, getStats, type Book } from "@/lib/queries";
 import { getOptionalSession } from "@/lib/session";
 
@@ -24,6 +25,10 @@ export default async function HomePage() {
     getStats(session.user.id),
     getReadingMap(session.user.id),
   ]);
+
+  // Tops up missing book genres in the background — one small select, the
+  // lookups happen after the response. See src/lib/genres.ts.
+  await queueGenreBackfill(session.user.id);
 
   const firstName = session.user.name?.split(" ")[0];
 

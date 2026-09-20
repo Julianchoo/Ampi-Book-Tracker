@@ -615,6 +615,14 @@ function GenreDetail({
   );
 }
 
+/*
+ * Genre ids are lowercased BISAC families, and most of them are several words
+ * ("young adult fiction", "biography & autobiography"). aria-labelledby takes a
+ * space-separated list of IDREFs, so an id used raw would resolve to three
+ * missing ids and the section would lose its accessible name.
+ */
+const slugId = (id: string) => id.replace(/[^a-z0-9]+/g, "-");
+
 /** The keyboard and screen-reader path through the same data. */
 function ListView({ map, index }: { map: ReadingMapData; index: Index }) {
   const roots = React.useMemo(
@@ -636,10 +644,11 @@ function ListView({ map, index }: { map: ReadingMapData; index: Index }) {
         const direct = map.books.filter(
           (b) => b.genreIds.includes(root.id) && !b.genreIds.some((g) => childIds.has(g))
         );
+        const headingId = `list-${slugId(root.id)}`;
         return (
-          <section key={root.id} aria-labelledby={`list-${root.id}`}>
+          <section key={root.id} aria-labelledby={headingId}>
             <h3
-              id={`list-${root.id}`}
+              id={headingId}
               className="flex items-baseline gap-2 border-b pb-1.5 font-display text-lg font-semibold"
             >
               {root.label}

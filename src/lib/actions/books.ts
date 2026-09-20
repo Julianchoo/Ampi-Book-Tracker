@@ -7,6 +7,7 @@ import { z } from "zod";
 import { ratingSchema, shelfSchema, statusSchema, type Shelf } from "@/lib/books";
 import { SOURCES } from "@/lib/books";
 import { db } from "@/lib/db";
+import { refreshGenres } from "@/lib/genres";
 import { refreshRatings } from "@/lib/ratings";
 import { book } from "@/lib/schema";
 import { requireAuth } from "@/lib/session";
@@ -90,14 +91,24 @@ export async function addBook(
       target: [book.userId, book.olKey],
       set: { shelf: d.shelf, updatedAt: new Date() },
     })
-    .returning({ id: book.id, olRatingCheckedAt: book.olRatingCheckedAt });
+    .returning({
+      id: book.id,
+      olRatingCheckedAt: book.olRatingCheckedAt,
+      genres: book.genres,
+    });
 
   if (!row) return { ok: false, error: "Couldn't save that book." };
+  const userId = session.user.id;
   // Re-adding a book already on a shelf upserts the same row; skip the lookup if it's fresh.
   if (pickStaleForRating([row]).length > 0) {
-    const userId = session.user.id;
     const target = { id: row.id, title: d.title, author: d.author ?? null };
     after(() => refreshRatings(userId, [target]));
+  }
+  // A never-looked-up book gets its real genres in the background, so they're
+  // there on the next page load. See src/lib/genres.ts.
+  if (row.genres === null) {
+    const target = { id: row.id, olKey: d.olKey, title: d.title, author: d.author ?? null };
+    after(() => refreshGenres(userId, [target]));
   }
   refresh(row.id);
   return { ok: true, id: row.id };

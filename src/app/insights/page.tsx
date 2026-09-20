@@ -1,5 +1,6 @@
 import { InsightsCharts } from "@/components/books/insights-charts";
 import { DachshundReading } from "@/components/dachshund";
+import { queueGenreBackfill } from "@/lib/genres";
 import { buildInsights } from "@/lib/insights";
 import { getInsightsBooks } from "@/lib/queries";
 import { requireAuth } from "@/lib/session";
@@ -10,6 +11,9 @@ export const metadata: Metadata = { title: "Insights" };
 export default async function InsightsPage() {
   const session = await requireAuth();
   const books = await getInsightsBooks(session.user.id);
+  // These charts are the main consumer of genres, so top a few up in the
+  // background — one small select, the lookups run after the response.
+  await queueGenreBackfill(session.user.id);
   const year = new Date().getFullYear();
   // Both ranges are built on the server so the toggle needs no round trip —
   // the same trick as the home stats.

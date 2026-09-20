@@ -59,6 +59,54 @@ test("Suspense and Thrillers under Fiction merge", () => {
   assert.deepEqual(genreIds(books), ["fiction", "fiction/thrillers"]);
 });
 
+test("BISAC shelf segments are not genres: Places is dropped", () => {
+  const remains = withSubjects("Fiction / Places / Europe");
+  const books = [remains, withSubjects("Fiction / Literary"), withSubjects("Fiction / Literary")];
+  const g = graph(books);
+  assert.ok(!g.genres.some((n) => n.id.includes("places")));
+  assert.deepEqual(g.books.find((b) => b.id === remains.id)!.genreIds, ["fiction"]);
+});
+
+test("a pivot segment truncates rather than closing up: two books share Fiction, not Europe", () => {
+  const books = [
+    withSubjects("Fiction / Places / Europe"),
+    withSubjects("Fiction / Places / Europe"),
+    withSubjects("Fiction / Literary"),
+  ];
+  const g = graph(books);
+  // Two books share "Europe", so dropping "Places" and closing the path up
+  // would qualify it as a genre node — the exact bug this is here to catch.
+  assert.deepEqual(g.genres.map((n) => n.id), ["fiction"]);
+});
+
+test("…and Women under Biography & Autobiography", () => {
+  const educated = withSubjects("Biography & Autobiography / Women");
+  const books = [
+    educated,
+    withSubjects("Biography & Autobiography / Memoirs"),
+    withSubjects("Biography & Autobiography / Memoirs"),
+  ];
+  const g = graph(books);
+  assert.ok(!g.genres.some((n) => n.id.includes("women")));
+  assert.deepEqual(g.books.find((b) => b.id === educated.id)!.genreIds, ["biography & autobiography"]);
+});
+
+test("Young Adult Fiction folds into the Fiction tree, joining flat synonyms", () => {
+  const ya = withSubjects("Young Adult Fiction / Fantasy / Dark Fantasy");
+  const flat = withSubjects("Fantasy");
+  const books = [ya, flat, withSubjects("Fantasy")];
+  const g = graph(books);
+  assert.ok(!g.genres.some((n) => n.id.includes("young adult")));
+  assert.deepEqual(g.books.find((b) => b.id === ya.id)!.genreIds, ["fiction/fantasy"]);
+  assert.deepEqual(g.books.find((b) => b.id === flat.id)!.genreIds, ["fiction/fantasy"]);
+});
+
+test("the Fiction fold runs before the Suspense fold", () => {
+  const ya = withSubjects("Young Adult Fiction / Thrillers / Suspense");
+  const books = [ya, withSubjects("Fiction / Thrillers"), withSubjects("Fiction / Thrillers")];
+  assert.deepEqual(linksOf(books, ya.id), ["fiction/thrillers"]);
+});
+
 test("labels use the most frequent casing", () => {
   const books = [
     withSubjects("History / Europe"),
@@ -92,7 +140,7 @@ test("books with no usable genre link to Other, created only when needed", () =>
   assert.ok(!genreIds(books.slice(1)).includes("other"));
 });
 
-test("at most two links per book, preferring depth then book count", () => {
+test("at most two links per book, preferring depth then the book's own order", () => {
   const many = withSubjects("Fiction / Horror", "Fiction / Fantasy", "History / Europe", "Fiction / Literary");
   const books = [
     many,
@@ -103,13 +151,22 @@ test("at most two links per book, preferring depth then book count", () => {
     withSubjects("History / Europe"),
     withSubjects("History / Europe"),
   ];
-  // History/Europe 4, Fantasy 3, Horror 2; Literary (1) falls back to fiction, which is shallower.
-  assert.deepEqual(linksOf(books, many.id), ["history/europe", "fiction/fantasy"]);
+  // Horror and Fantasy come first for this book even though History/Europe has
+  // four books and Horror two; Literary (1) falls back to fiction, which is
+  // shallower. Ranking by shelf-wide popularity is what files A Game of
+  // Thrones under Science Fiction.
+  assert.deepEqual(linksOf(books, many.id), ["fiction/horror", "fiction/fantasy"]);
+});
+
+test("a deeper genre still beats an earlier shallower one", () => {
+  const many = withSubjects("History", "Fiction / Horror");
+  const books = [many, withSubjects("History"), withSubjects("Fiction / Horror")];
+  assert.deepEqual(linksOf(books, many.id), ["fiction/horror", "history"]);
 });
 
 test("a genre left with one book by the cap is dropped; its book falls back to Other", () => {
-  // `many` caps to Horror (3) + Europe (3), leaving Travel/Asia with `lone` only.
-  const many = withSubjects("Travel / Asia", "Fiction / Horror", "History / Europe");
+  // `many` caps to its first two, Horror + Europe, leaving Travel/Asia with `lone` only.
+  const many = withSubjects("Fiction / Horror", "History / Europe", "Travel / Asia");
   const lone = withSubjects("Travel / Asia");
   const books = [
     many,
@@ -126,7 +183,7 @@ test("a genre left with one book by the cap is dropped; its book falls back to O
 });
 
 test("…or to its parent when the parent still has two books", () => {
-  const many = withSubjects("Travel / Asia", "Fiction / Horror", "History / Europe");
+  const many = withSubjects("Fiction / Horror", "History / Europe", "Travel / Asia");
   const lone = withSubjects("Travel / Asia");
   const books = [
     many,

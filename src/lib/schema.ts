@@ -108,7 +108,15 @@ export const book = pgTable(
     firstPublishYear: integer("first_publish_year"),
     pages: integer("pages"),
     language: text("language"),
+    // Topical tags as the provider gave them ("Butlers", "Country homes").
+    // What the shelf facets browse by; too unruly to classify with.
     subjects: text("subjects").array(),
+    // BISAC paths from the Google Books per-volume endpoint ("Fiction /
+    // Thrillers / Psychological"), which the reading map classifies by. Filled
+    // in the background, so: null = never looked up, [] = Google has nothing.
+    // A book's BISAC does not change, so there is no TTL and null is the whole
+    // backfill predicate.
+    genres: text("genres").array(),
     // Stored at add time when the provider returns it (Google Books does), so
     // the book page needs no second network call to render its blurb.
     description: text("description"),

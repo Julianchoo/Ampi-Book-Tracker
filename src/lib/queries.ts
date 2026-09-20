@@ -141,9 +141,20 @@ export async function getBookByOlKey(
   return row ? { id: row.id, shelf: row.shelf as Shelf } : null;
 }
 
+/*
+ * The classifier takes one list of subject strings, and BISAC genres are the
+ * better one when we have them: `subjects` is whatever the search endpoint
+ * happened to return ("Butlers", "Country homes"), good enough to browse by but
+ * not to classify with. A book still waiting for its backfill falls back to
+ * them rather than dropping off the map.
+ */
+const classifyBy = <T extends { genres: string[] | null; subjects: string[] | null }>(
+  row: T
+) => ({ ...row, subjects: row.genres?.length ? row.genres : row.subjects });
+
 /** Both shelves, only the fields the reading map shows (no notes/description reach the client). */
 export async function getConstellationBooks(userId: string): Promise<MapBookInput[]> {
-  return db
+  const rows = await db
     .select({
       id: book.id,
       title: book.title,
@@ -151,6 +162,7 @@ export async function getConstellationBooks(userId: string): Promise<MapBookInpu
       olKey: book.olKey,
       coverId: book.coverId,
       subjects: book.subjects,
+      genres: book.genres,
       shelf: book.shelf,
       status: book.status,
       rating: book.rating,
@@ -159,11 +171,12 @@ export async function getConstellationBooks(userId: string): Promise<MapBookInpu
     })
     .from(book)
     .where(eq(book.userId, userId));
+  return rows.map(classifyBy);
 }
 
 /** Both shelves, only the fields the insights page needs. */
 export async function getInsightsBooks(userId: string): Promise<InsightsBook[]> {
-  return db
+  const rows = await db
     .select({
       id: book.id,
       title: book.title,
@@ -171,6 +184,7 @@ export async function getInsightsBooks(userId: string): Promise<InsightsBook[]> 
       olKey: book.olKey,
       coverId: book.coverId,
       subjects: book.subjects,
+      genres: book.genres,
       shelf: book.shelf,
       status: book.status,
       rating: book.rating,
@@ -181,6 +195,7 @@ export async function getInsightsBooks(userId: string): Promise<InsightsBook[]> 
     })
     .from(book)
     .where(eq(book.userId, userId));
+  return rows.map(classifyBy);
 }
 
 /** The book for the home hero: most recently started, still being read. */
