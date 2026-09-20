@@ -17,6 +17,7 @@ export const protectedRoutes = [
   "/library",
   "/wishlist",
   "/books",
+  "/search",
   "/profile",
 ];
 

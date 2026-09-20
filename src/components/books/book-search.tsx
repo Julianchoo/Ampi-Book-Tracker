@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BookOpen, Heart, Library, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { BookCoverImage } from "@/components/books/book-cover-image";
+import { useAddBook } from "@/components/books/use-add-book";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -14,32 +16,18 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
-import { addBook } from "@/lib/actions/books";
-import { coverUrls, type Shelf } from "@/lib/books";
+import { coverUrls, previewHref, type SearchHit, type Shelf } from "@/lib/books";
 import { cn } from "@/lib/utils";
 
-type Hit = {
-  olKey: string;
-  source: "openlibrary" | "google";
-  description: string | null;
-  title: string;
-  author: string | null;
-  coverId: number | null;
-  firstPublishYear: number | null;
-  pages: number | null;
-  language: string | null;
-  subjects: string[];
-  onShelf: Shelf | null;
-  bookId: string | null;
-};
+type Hit = SearchHit;
 
 export function BookSearch({ className }: { className?: string | undefined }) {
   const router = useRouter();
+  const { pending, add } = useAddBook();
   const [query, setQuery] = React.useState("");
   const [hits, setHits] = React.useState<Hit[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [open, setOpen] = React.useState(false);
-  const [pending, setPending] = React.useState<string | null>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
   // Only the newest request is allowed to write state. Open Library responses
@@ -95,48 +83,19 @@ export function BookSearch({ className }: { className?: string | undefined }) {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
 
-  async function add(hit: Hit, shelf: Shelf) {
-    setPending(hit.olKey);
-    const result = await addBook({
-      olKey: hit.olKey,
-      source: hit.source,
-      // Google returns the blurb inline; storing it now means the book page
-      // opens with no network call of its own.
-      description: hit.description,
-      title: hit.title,
-      author: hit.author,
-      coverId: hit.coverId,
-      firstPublishYear: hit.firstPublishYear,
-      pages: hit.pages,
-      language: hit.language,
-      subjects: hit.subjects,
-      shelf,
-    });
-    setPending(null);
-
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
+  async function addFromDropdown(hit: Hit, shelf: Shelf) {
+    const id = await add(hit, shelf);
+    if (id) {
+      setOpen(false);
+      setQuery("");
     }
+  }
 
+  function goToResultsPage() {
+    const q = query.trim();
+    if (q.length < 2) return;
     setOpen(false);
-    setQuery("");
-
-    // Refresh in place rather than navigating: the shelf the user is looking
-    // at updates immediately, and they avoid a page load that waits on Open
-    // Library. Opening the book to add a rating is offered, not forced.
-    router.refresh();
-    toast.success(
-      shelf === "library"
-        ? `“${hit.title}” added to your library`
-        : `“${hit.title}” added to your wishlist`,
-      {
-        action: {
-          label: "Add details",
-          onClick: () => router.push(`/books/${result.id}?welcome=1`),
-        },
-      }
-    );
+    router.push(`/search?q=${encodeURIComponent(q)}`);
   }
 
   return (
@@ -150,7 +109,13 @@ export function BookSearch({ className }: { className?: string | undefined }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => hits.length > 0 && setOpen(true)}
-          onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setOpen(false);
+            if (e.key === "Enter") {
+              e.preventDefault();
+              goToResultsPage();
+            }
+          }}
           placeholder="Search any book or author…"
           aria-label="Search for a book by title or author"
           className="h-12 pl-9 text-base"
@@ -187,79 +152,90 @@ export function BookSearch({ className }: { className?: string | undefined }) {
                     <CommandItem
                       key={hit.olKey}
                       value={hit.olKey}
-                      // Selection is handled by the explicit buttons below
+                      // Selection is handled by the explicit link/buttons below
                       onSelect={() => {}}
-                      className="flex items-start gap-3.5 rounded-lg px-2 py-3"
+                      className="flex flex-col gap-2 rounded-lg px-2 py-3"
                     >
-                      <div className="relative h-[5.5rem] w-[3.75rem] shrink-0 overflow-hidden rounded-md border bg-muted shadow-sm">
-                        <BookCoverImage
-                          src={cover}
-                          alt=""
-                          fill
-                          sizes="60px"
-                          className="object-cover"
-                          fallback={
-                            <BookOpen className="absolute top-1/2 left-1/2 size-5 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/50" />
-                          }
-                        />
-                      </div>
+                      <Link
+                        href={previewHref(hit)}
+                        onClick={() => setOpen(false)}
+                        className="flex items-start gap-3.5 rounded-md focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+                      >
+                        <div className="relative h-[5.5rem] w-[3.75rem] shrink-0 overflow-hidden rounded-md border bg-muted shadow-sm">
+                          <BookCoverImage
+                            src={cover}
+                            alt=""
+                            fill
+                            sizes="60px"
+                            className="object-cover"
+                            fallback={
+                              <BookOpen className="absolute top-1/2 left-1/2 size-5 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/50" />
+                            }
+                          />
+                        </div>
 
-                      <div className="min-w-0 flex-1">
-                        <p className="line-clamp-2 text-[0.95rem] leading-snug font-semibold">
-                          {hit.title}
-                        </p>
-                        <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                          {[hit.author, hit.firstPublishYear]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </p>
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-[0.95rem] leading-snug font-semibold hover:underline">
+                            {hit.title}
+                          </p>
+                          <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                            {[hit.author, hit.firstPublishYear]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
 
-                        {hit.onShelf ? (
+                          {hit.onShelf && (
+                            <p className="mt-2 text-sm text-muted-foreground">
+                              Already on your{" "}
+                              {hit.onShelf === "library" ? "shelf" : "wishlist"}
+                            </p>
+                          )}
+                        </div>
+                      </Link>
+
+                      {!hit.onShelf && (
+                        <div className="ml-[calc(3.75rem+0.875rem)] flex flex-wrap gap-2">
                           <Button
                             size="sm"
-                            variant="ghost"
-                            className="mt-2 h-9 px-2.5 text-sm"
-                            onClick={() => {
-                              setOpen(false);
-                              router.push(`/books/${hit.bookId}`);
-                            }}
+                            className="h-9 px-3 text-sm"
+                            disabled={busy}
+                            onClick={() => addFromDropdown(hit, "library")}
                           >
-                            Already on your{" "}
-                            {hit.onShelf === "library" ? "shelf" : "wishlist"} —
-                            view
+                            {busy ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Library className="size-4" />
+                            )}
+                            Library
                           </Button>
-                        ) : (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              className="h-9 px-3 text-sm"
-                              disabled={busy}
-                              onClick={() => add(hit, "library")}
-                            >
-                              {busy ? (
-                                <Loader2 className="size-4 animate-spin" />
-                              ) : (
-                                <Library className="size-4" />
-                              )}
-                              Library
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="h-9 px-3 text-sm"
-                              disabled={busy}
-                              onClick={() => add(hit, "wishlist")}
-                            >
-                              <Heart className="size-4" />
-                              Wishlist
-                            </Button>
-                          </div>
-                        )}
-                      </div>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-9 px-3 text-sm"
+                            disabled={busy}
+                            onClick={() => addFromDropdown(hit, "wishlist")}
+                          >
+                            <Heart className="size-4" />
+                            Wishlist
+                          </Button>
+                        </div>
+                      )}
                     </CommandItem>
                   );
                 })}
               </CommandGroup>
+            )}
+            {hits.length > 0 && (
+              <div className="border-t p-1">
+                <Button
+                  variant="ghost"
+                  className="h-9 w-full justify-center text-sm text-muted-foreground"
+                  onClick={goToResultsPage}
+                >
+                  <Search className="size-4" />
+                  See all results for “{query.trim()}”
+                </Button>
+              </div>
             )}
           </CommandList>
         </Command>

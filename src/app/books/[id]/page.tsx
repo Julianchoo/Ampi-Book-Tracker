@@ -1,9 +1,9 @@
-import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { ArrowLeft, BookOpen, ExternalLink, Heart, Library } from "lucide-react";
 import { BookCoverImage } from "@/components/books/book-cover-image";
+import { BookDescription } from "@/components/books/book-description";
 import { BookDetailsForm } from "@/components/books/book-details-form";
 import { CollectionPicker } from "@/components/books/collection-picker";
 import { StarRatingDisplay } from "@/components/books/star-rating";
@@ -18,7 +18,6 @@ import {
   STATUS_LABELS,
   type Status,
 } from "@/lib/books";
-import { getDescription } from "@/lib/booksearch";
 import { getBook, getBookCollections, getUserCollections } from "@/lib/queries";
 import { refreshRatings } from "@/lib/ratings";
 import { requireAuth } from "@/lib/session";
@@ -199,59 +198,12 @@ export default async function BookPage({
 
       {/* Open Library takes 2-4s to answer, so the blurb streams in rather
           than holding up the cover, facts and edit form behind it. */}
-      {book.description ? (
-        <DescriptionBody text={book.description} />
-      ) : (
-        <Suspense fallback={<DescriptionSkeleton />}>
-          <BookDescription olKey={book.olKey} />
-        </Suspense>
-      )}
+      <BookDescription olKey={book.olKey} initial={book.description} />
 
       <div className="mt-7">
         <BookDetailsForm book={book} highlight={welcome === "1"} />
       </div>
     </div>
   );
-}
-
-function DescriptionSkeleton() {
-  return (
-    <section className="mt-6" aria-hidden="true">
-      <div className="h-5 w-40 animate-pulse rounded bg-muted" />
-      <div className="mt-3 space-y-2">
-        <div className="h-3.5 w-full animate-pulse rounded bg-muted" />
-        <div className="h-3.5 w-11/12 animate-pulse rounded bg-muted" />
-        <div className="h-3.5 w-4/5 animate-pulse rounded bg-muted" />
-      </div>
-    </section>
-  );
-}
-
-/** Streamed: renders nothing when Open Library has no blurb for the work. */
-function DescriptionBody({ text }: { text: string }) {
-  return (
-    <section className="mt-6">
-      <h2 className="font-display text-lg font-semibold">About this book</h2>
-      {/* Provider blurbs are plain text with hard line breaks */}
-      <div className="mt-2 space-y-3 text-sm leading-7 text-muted-foreground">
-        {text
-          .split(/\n{2,}/)
-          .slice(0, 6)
-          .map((para, i) => (
-            <p key={i}>{para.replace(/\s*\n\s*/g, " ").trim()}</p>
-          ))}
-      </div>
-    </section>
-  );
-}
-
-/**
- * Only reached by rows saved before descriptions were stored. Streamed, since
- * the lookup can take seconds and must not hold up the rest of the page.
- */
-async function BookDescription({ olKey }: { olKey: string }) {
-  const description = await getDescription(olKey);
-  if (!description) return null;
-  return <DescriptionBody text={description} />;
 }
 
