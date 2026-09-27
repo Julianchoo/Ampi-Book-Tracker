@@ -6,11 +6,13 @@ import { ShelfToolbar } from "@/components/books/shelf-toolbar";
 import { ViewToggle } from "@/components/books/view-toggle";
 import { DachshundReading } from "@/components/dachshund";
 import { Button } from "@/components/ui/button";
+import { SHELF_VIEWS } from "@/lib/books";
 import { getShelfView } from "@/lib/queries";
 import { requireAuth } from "@/lib/session";
 import {
   clearFiltersHref,
   filterBooks,
+  groupByMonth,
   groupByYear,
   hasActiveFilters,
   libraryHighlights,
@@ -44,7 +46,9 @@ export default async function LibraryPage({
   const highlights = hasActiveFilters(filters)
     ? null
     : libraryHighlights(books, new Date().getFullYear());
-  const sections = shouldGroup("library", filters) ? groupByYear(visible) : null;
+  // List rows are tall, so a year is a long scroll there; months keep sections short.
+  const groupBy = filters.view === "list" ? groupByMonth : groupByYear;
+  const sections = shouldGroup("library", filters) ? groupBy(visible) : null;
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-6 sm:py-8">
@@ -57,7 +61,7 @@ export default async function LibraryPage({
             Everything you&rsquo;ve started, finished, or set aside.
           </p>
         </div>
-        {books.length > 0 && <ViewToggle view={filters.view} />}
+        {books.length > 0 && <ViewToggle view={filters.view} views={SHELF_VIEWS.library} />}
       </header>
 
       <BookSearch className="mb-5" />

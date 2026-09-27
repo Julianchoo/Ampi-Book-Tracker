@@ -4,6 +4,7 @@ import { MIN_COMMUNITY_RATINGS, type Shelf, type SortKey } from "@/lib/books";
 import type { MapBookInput } from "@/lib/constellation";
 import { db } from "@/lib/db";
 import type { InsightsBook } from "@/lib/insights";
+import { monthKey } from "@/lib/months";
 import { book, bookCollection, collection } from "@/lib/schema";
 
 export type Book = typeof book.$inferSelect;
@@ -229,6 +230,8 @@ export type ReadingStats = {
   allTime: FinishedTotals;
   thisYear: FinishedTotals;
   year: number;
+  /** "YYYY-MM" (UTC), chosen here so the client never guesses its own "now". */
+  currentMonth: string;
   /* Present-tense counts — "how many are on that shelf right now" has no year. */
   totalReading: number;
   wishlistCount: number;
@@ -281,6 +284,7 @@ export async function getStats(userId: string): Promise<ReadingStats> {
       and(
         eq(book.userId, userId),
         eq(book.status, "finished"),
+        eq(book.shelf, "library"),
         sql`${book.finishedAt} is not null`
       )
     )
@@ -303,6 +307,7 @@ export async function getStats(userId: string): Promise<ReadingStats> {
       avgPages: num(counts?.yAvgPages),
     },
     year: new Date().getFullYear(),
+    currentMonth: monthKey(new Date()),
     totalReading: counts?.totalReading ?? 0,
     wishlistCount: counts?.wishlistCount ?? 0,
     byMonth: rows.map((r) => ({

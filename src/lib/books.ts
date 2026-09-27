@@ -77,8 +77,14 @@ export const SHELF_SORTS: Record<Shelf, readonly SortKey[]> = {
 
 export const DEFAULT_SORT: Record<Shelf, SortKey> = { library: "recent", wishlist: "added" };
 
-export const VIEWS = ["grid", "wall"] as const;
+export const VIEWS = ["grid", "wall", "list"] as const;
 export type View = (typeof VIEWS)[number];
+
+/** The list view is built around your own rating and notes, which wishlist books don't have. */
+export const SHELF_VIEWS: Record<Shelf, readonly View[]> = {
+  library: VIEWS,
+  wishlist: ["grid", "wall"],
+};
 
 /**
  * Below this many Open Library ratings an average is noise ("5.0 from 1"), so

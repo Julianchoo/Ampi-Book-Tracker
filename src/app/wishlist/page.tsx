@@ -8,6 +8,7 @@ import { StartReadingButton } from "@/components/books/start-reading-button";
 import { ViewToggle } from "@/components/books/view-toggle";
 import { DachshundReading, DachshundSleeping } from "@/components/dachshund";
 import { Button } from "@/components/ui/button";
+import { SHELF_VIEWS } from "@/lib/books";
 import { getShelfView } from "@/lib/queries";
 import { refreshRatings } from "@/lib/ratings";
 import { requireAuth } from "@/lib/session";
@@ -65,7 +66,7 @@ export default async function WishlistPage({
             Books to get to. Start one and it moves to your library.
           </p>
         </div>
-        {books.length > 0 && <ViewToggle view={filters.view} />}
+        {books.length > 0 && <ViewToggle view={filters.view} views={SHELF_VIEWS.wishlist} />}
       </header>
 
       <BookSearch className="mb-5" />

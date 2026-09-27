@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   clearFiltersHref,
   filterBooks,
+  groupByMonth,
   groupByYear,
   hasActiveFilters,
   libraryHighlights,
@@ -44,7 +45,7 @@ const noFilters: ShelfFilters = parseShelfParams({}, "library");
 const ids = (books: ShelfBook[]) => books.map((b) => b.id);
 
 test("parseShelfParams falls back on anything invalid", () => {
-  assert.deepEqual(parseShelfParams({ status: "lost", sort: "nope", view: "list", collection: "abc" }, "library"), {
+  assert.deepEqual(parseShelfParams({ status: "lost", sort: "nope", view: "table", collection: "abc" }, "library"), {
     status: undefined,
     subject: undefined,
     author: undefined,
@@ -68,6 +69,12 @@ test("parseShelfParams keeps valid values, takes the first of an array, trims te
   assert.equal(parseShelfParams({ author: "x".repeat(201) }, "library").author, undefined);
 });
 
+test("the list view is library-only", () => {
+  assert.equal(parseShelfParams({ view: "list" }, "library").view, "list");
+  assert.equal(parseShelfParams({ view: "list" }, "wishlist").view, "grid");
+  assert.equal(parseShelfParams({ view: "wall" }, "wishlist").view, "wall");
+});
+
 test("status is ignored on the wishlist, and sorts are shelf-specific", () => {
   const f = parseShelfParams({ status: "reading", sort: "rating" }, "wishlist");
   assert.equal(f.status, undefined);
@@ -81,12 +88,17 @@ test("hasActiveFilters ignores sort and view", () => {
   assert.equal(hasActiveFilters(parseShelfParams({ subject: "x" }, "library")), true);
 });
 
-test("clearFiltersHref drops filters, keeps non-default sort and the wall view", () => {
+test("clearFiltersHref drops filters, keeps non-default sort and view", () => {
   assert.equal(clearFiltersHref("library", parseShelfParams({ subject: "x", sort: "recent" }, "library")), "/library");
   assert.equal(
     clearFiltersHref("wishlist", parseShelfParams({ author: "a", sort: "title", view: "wall" }, "wishlist")),
     "/wishlist?sort=title&view=wall"
   );
+  assert.equal(
+    clearFiltersHref("library", parseShelfParams({ status: "finished", view: "list" }, "library")),
+    "/library?view=list"
+  );
+  assert.equal(clearFiltersHref("library", parseShelfParams({ view: "grid" }, "library")), "/library");
 });
 
 test("filterBooks matches subject and author case-insensitively, and by collection", () => {
@@ -155,6 +167,40 @@ test("groupByYear orders sections and routes edge cases", () => {
 test("groupByYear omits pages when none are known", () => {
   const [section] = groupByYear([book({ finishedAt: "2024-01-01", rating: 7.5 })]);
   assert.equal(section!.summary, "1 book · avg 7.5");
+});
+
+test("groupByMonth orders months newest-first with UTC titles and routes edge cases", () => {
+  const r = book({ status: "reading", finishedAt: "2026-09-01" });
+  const sep1 = book({ status: "finished", finishedAt: "2026-09-01", pages: 300, rating: 7 });
+  const sep30 = book({ status: "finished", finishedAt: "2026-09-30", pages: 200, rating: 9 });
+  const aug = book({ status: "finished", finishedAt: "2026-08-15" });
+  const lastDec = book({ status: "finished", finishedAt: "2025-12-31", pages: 50 });
+  const jan = book({ status: "finished", finishedAt: "2026-01-01" });
+  const abandoned = book({ status: "abandoned", finishedAt: "2026-09-10" });
+  const noDate = book({ status: "finished" });
+  const badDate = book({ status: "finished", finishedAt: "2026-13-01" });
+  const sections = groupByMonth([lastDec, sep1, abandoned, aug, noDate, jan, r, sep30, badDate]);
+
+  assert.deepEqual(
+    sections.map((s) => [s.key, s.title, ids(s.books)]),
+    [
+      ["reading", "Reading", [r.id]],
+      ["month-2026-09", "September 2026", [sep1.id, sep30.id]],
+      ["month-2026-08", "August 2026", [aug.id]],
+      ["month-2026-01", "January 2026", [jan.id]],
+      ["month-2025-12", "December 2025", [lastDec.id]],
+      ["no-date", "No date", [noDate.id, badDate.id]],
+      ["abandoned", "Abandoned", [abandoned.id]],
+    ]
+  );
+  assert.equal(sections[1]!.summary, "2 books · 500 pages · avg 8.0");
+  assert.equal(sections[2]!.summary, "1 book");
+  assert.equal(sections[4]!.summary, "1 book · 50 pages");
+  assert.equal(sections[5]!.summary, "2 books");
+});
+
+test("groupByMonth returns no sections for no books", () => {
+  assert.deepEqual(groupByMonth([]), []);
 });
 
 test("shouldGroup only for the default library view", () => {
