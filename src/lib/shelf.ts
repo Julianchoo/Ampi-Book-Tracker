@@ -1,4 +1,4 @@
-import { DEFAULT_SORT, MIN_COMMUNITY_RATINGS, SHELF_SORTS, STATUSES, VIEWS } from "./books.ts";
+import { DEFAULT_SORT, MIN_COMMUNITY_RATINGS, SHELF_SORTS, SHELF_VIEWS, STATUSES } from "./books.ts";
 import type { Shelf, SortKey, Status, View } from "./books.ts";
 
 /*
@@ -64,7 +64,7 @@ export function parseShelfParams(params: RawParams, shelf: Shelf): ShelfFilters 
     author: textParam(params.author),
     collection: collection && UUID_RE.test(collection) ? collection : undefined,
     sort: includes(SHELF_SORTS[shelf], sort) ? sort : DEFAULT_SORT[shelf],
-    view: includes(VIEWS, view) ? view : "grid",
+    view: includes(SHELF_VIEWS[shelf], view) ? view : "grid",
   };
 }
 
@@ -77,7 +77,8 @@ export function hasActiveFilters(f: ShelfFilters): boolean {
 export function clearFiltersHref(shelf: Shelf, filters: ShelfFilters): string {
   const params = new URLSearchParams();
   if (filters.sort !== DEFAULT_SORT[shelf]) params.set("sort", filters.sort);
-  if (filters.view === "wall") params.set("view", "wall");
+  // "grid" is the default, so it never needs the param.
+  if (filters.view !== "grid") params.set("view", filters.view);
   const qs = params.toString();
   return qs ? `/${shelf}?${qs}` : `/${shelf}`;
 }
@@ -174,12 +175,12 @@ function plural(n: number, word: string): string {
 
 export type ShelfSection<T> = { key: string; title: string | null; summary: string | null; books: T[] };
 
-/** Year sections only tell a story in the default chronological view with finished books in it. */
+/** Date sections only tell a story in the default chronological view with finished books in it. */
 export function shouldGroup(shelf: Shelf, f: ShelfFilters): boolean {
   return shelf === "library" && f.sort === "recent" && f.status !== "reading" && f.status !== "abandoned";
 }
 
-function yearSummary(books: ShelfBook[]): string {
+function periodSummary(books: ShelfBook[]): string {
   const parts = [plural(books.length, "book")];
   const pages = books.reduce((sum, b) => sum + (b.pages ?? 0), 0);
   if (pages > 0) parts.push(`${pages.toLocaleString("en-GB")} pages`);
@@ -191,21 +192,35 @@ function yearSummary(books: ShelfBook[]): string {
   return parts.join(" · ");
 }
 
-export function groupByYear<T extends ShelfBook>(books: T[]): ShelfSection<T>[] {
+type Period = { key: string; title: string };
+
+/**
+ * Reading first, then finished periods newest-first, then undated, then
+ * abandoned. `periodOf` maps a finish date to its section, or null when the
+ * date can't be placed (the book then counts as undated).
+ */
+function groupByPeriod<T extends ShelfBook>(
+  books: T[],
+  periodOf: (finishedAt: string) => Period | null
+): ShelfSection<T>[] {
   const reading: T[] = [];
   const abandoned: T[] = [];
   const noDate: T[] = [];
-  const years = new Map<string, T[]>();
+  const periods = new Map<string, { title: string; books: T[] }>();
   for (const b of books) {
-    // An abandoned book may still carry a finish date; it isn't a book read that year.
+    // An abandoned book may still carry a finish date; it isn't a book read then.
     if (b.status === "reading") reading.push(b);
     else if (b.status === "abandoned") abandoned.push(b);
-    else if (b.finishedAt) {
-      const year = b.finishedAt.slice(0, 4);
-      const list = years.get(year);
-      if (list) list.push(b);
-      else years.set(year, [b]);
-    } else noDate.push(b);
+    else {
+      const period = b.finishedAt ? periodOf(b.finishedAt) : null;
+      if (!period) {
+        noDate.push(b);
+        continue;
+      }
+      const group = periods.get(period.key);
+      if (group) group.books.push(b);
+      else periods.set(period.key, { title: period.title, books: [b] });
+    }
   }
 
   const simple = (key: string, title: string, list: T[]): ShelfSection<T> => ({
@@ -217,13 +232,39 @@ export function groupByYear<T extends ShelfBook>(books: T[]): ShelfSection<T>[] 
 
   const sections: ShelfSection<T>[] = [];
   if (reading.length) sections.push(simple("reading", "Reading", reading));
-  for (const year of [...years.keys()].sort().reverse()) {
-    const list = years.get(year)!;
-    sections.push({ key: `year-${year}`, title: year, summary: yearSummary(list), books: list });
+  // Keys are zero-padded ISO prefixes, so string order is chronological order.
+  for (const key of [...periods.keys()].sort().reverse()) {
+    const { title, books: list } = periods.get(key)!;
+    sections.push({ key, title, summary: periodSummary(list), books: list });
   }
   if (noDate.length) sections.push(simple("no-date", "No date", noDate));
   if (abandoned.length) sections.push(simple("abandoned", "Abandoned", abandoned));
   return sections;
+}
+
+export function groupByYear<T extends ShelfBook>(books: T[]): ShelfSection<T>[] {
+  return groupByPeriod(books, (finishedAt) => {
+    const year = finishedAt.slice(0, 4);
+    return { key: `year-${year}`, title: year };
+  });
+}
+
+const MONTH_RE = /^(\d{4})-(\d{2})/;
+
+/** Finer sections for the list view, where each row is tall enough that a year is a long scroll. */
+export function groupByMonth<T extends ShelfBook>(books: T[]): ShelfSection<T>[] {
+  return groupByPeriod(books, (finishedAt) => {
+    const m = MONTH_RE.exec(finishedAt);
+    const month = m ? Number(m[2]) : 0;
+    if (!m || month < 1 || month > 12) return null;
+    // UTC on both ends so the title never slips a month across time zones.
+    const title = new Date(Date.UTC(Number(m[1]), month - 1, 1)).toLocaleDateString("en-GB", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+    return { key: `month-${m[1]}-${m[2]}`, title };
+  });
 }
 
 export type Highlight<T> = { label: string; value: string; book: T };

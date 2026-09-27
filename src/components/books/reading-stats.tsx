@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ChevronDown } from "lucide-react";
 import {
   Bar,
   CartesianGrid,
@@ -17,7 +18,18 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { MAX_RATING } from "@/lib/books";
+import { buildMonthOptions, formatMonth } from "@/lib/months";
 import type { ReadingStats } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
@@ -72,6 +84,86 @@ function StatTile({
       </p>
       {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
     </div>
+  );
+}
+
+/*
+ * The "now" figure: books finished in one calendar month, current by default.
+ * The whole tile is the menu trigger — a small, obvious target on a phone —
+ * and it deliberately ignores the All time / year toggle: a single month is
+ * already its own range.
+ */
+function MonthTile({
+  byMonth,
+  currentMonth,
+}: {
+  byMonth: ReadingStats["byMonth"];
+  currentMonth: string;
+}) {
+  const [selected, setSelected] = React.useState(currentMonth);
+
+  const groups = React.useMemo(
+    () => buildMonthOptions(byMonth, currentMonth),
+    [byMonth, currentMonth]
+  );
+  const finished =
+    byMonth.find((m) => m.month === selected)?.finished ?? 0;
+  const isCurrent = selected === currentMonth;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Books finished in ${formatMonth(selected)}, change month`}
+          className="group min-w-0 cursor-pointer rounded-lg border bg-card p-3 text-left shadow-sm outline-none transition-[color,background-color,box-shadow] hover:bg-accent/60 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[state=open]:bg-accent/60 sm:p-4"
+        >
+          <span className="flex items-center justify-between gap-1 text-xs text-muted-foreground">
+            <span className="truncate">
+              {isCurrent ? "This month" : formatMonth(selected, "short")}
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              className="h-3 w-3 shrink-0 transition-transform group-data-[state=open]:rotate-180"
+            />
+          </span>
+          <span className="mt-0.5 block font-display text-2xl font-bold tabular-nums sm:text-3xl">
+            {finished}
+          </span>
+          <span className="block text-xs text-muted-foreground">
+            {finished === 1 ? "book finished" : "books finished"}
+          </span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-80 w-56">
+        {!isCurrent && (
+          <>
+            <DropdownMenuItem onSelect={() => setSelected(currentMonth)}>
+              Back to this month
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        <DropdownMenuRadioGroup value={selected} onValueChange={setSelected}>
+          {groups.map((group, i) => (
+            <React.Fragment key={group.year}>
+              {i > 0 && <DropdownMenuSeparator />}
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                {group.year}
+              </DropdownMenuLabel>
+              {group.months.map((m) => (
+                <DropdownMenuRadioItem key={m.month} value={m.month}>
+                  {formatMonth(m.month)}
+                  <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+                    {m.finished}
+                  </span>
+                </DropdownMenuRadioItem>
+              ))}
+            </React.Fragment>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -145,7 +237,8 @@ export function ReadingStatsCharts({ stats }: { stats: ReadingStats }) {
         <RangeToggle year={stats.year} value={yearOnly} onChange={setYearOnly} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <MonthTile byMonth={stats.byMonth} currentMonth={stats.currentMonth} />
         <StatTile label="Finished" value={String(totals.finished)} />
         <StatTile label="Reading now" value={String(stats.totalReading)} />
         <StatTile

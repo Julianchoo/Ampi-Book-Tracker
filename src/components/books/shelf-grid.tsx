@@ -1,4 +1,5 @@
 import { BookCard } from "@/components/books/book-card";
+import { BookListItem } from "@/components/books/book-list-item";
 import type { View } from "@/lib/books";
 import type { Book } from "@/lib/queries";
 import type { ShelfSection } from "@/lib/shelf";
@@ -7,6 +8,8 @@ import { cn } from "@/lib/utils";
 const GRID_CLASSES: Record<View, string> = {
   grid: "grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4",
   wall: "grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-7",
+  // Rows carry notes, so a readable measure beats using the full width.
+  list: "max-w-3xl divide-y [&>li]:py-4 [&>li:first-child]:pt-0 [&>li:last-child]:pb-0",
 };
 
 type ShelfGridProps<T extends Book> = {
@@ -31,7 +34,9 @@ export function ShelfGrid<T extends Book>({
     <ul className={cn(GRID_CLASSES[view], className)}>
       {list.map((b) => (
         <li key={b.id}>
-          {view === "wall" ? (
+          {view === "list" ? (
+            <BookListItem book={b} />
+          ) : view === "wall" ? (
             <BookCard book={b} variant="wall" />
           ) : (
             <BookCard
